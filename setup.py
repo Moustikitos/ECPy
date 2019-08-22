@@ -38,6 +38,9 @@ setup(name='ECPy',
       packages=['ecpy'],
       package_dir={'ecpy': 'src/ecpy'},
       install_requires=reqs,
+      extra_requires={
+          ':python_version<="2.7"': ['future']
+      }
       classifiers=['Programming Language :: Python :: 2.7',
                    'Programming Language :: Python :: 3',
                    'Development Status :: 4 - Beta',

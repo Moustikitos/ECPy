@@ -159,7 +159,7 @@ class ECSchnorr:
         """
         return self._do_sign(msg, pv_key,k)
 
-    def sign_rfc6979(self, msg, pv_key, hasher, canonical=False):
+    def sign_rfc6979(self, msg, pv_key, hasher=None, canonical=False):
         """ Signs a message hash according to RFC6979 
         Args:
             msg (bytes)                    : the message hash to sign
@@ -169,15 +169,50 @@ class ECSchnorr:
         field = pv_key.curve.field
         V = None
         for i in range(1, self.maxtries):
-            k,V = ecrand.rnd_rfc6979(msg, pv_key.d, field, hasher, V)
+            k,V = ecrand.rnd_rfc6979(msg, pv_key.d, field, self._hasher in not hasher else hasher, V)
             sig = self._do_sign(msg, pv_key, k)
             if sig:
                 return sig
             return None
 
+    def sign_secp256k1(self, msg, pv_key):
+        """
+        Specific signature for SECP256K1 curve:
+        https://github.com/sipa/bips/blob/bip-schnorr/bip-schnorr.mediawiki
+
+        Args:
+            msg (bytes)                    : the message hash to sign
+            pv_key (ecpy.keys.ECPrivateKey): key to use for signing
+        """
+        n = pv_key.curve.order
+        size = pv_key.curve.size>>3
+        G = pv_key.curve.generator
+
+        # Let k' = int(hash(bytes(d) || m)) mod n
+        data = pv_key.d.to_bytes(size, "little") + msg
+        kp = int.from_bytes(self._hasher(data).digest(), "little") % n
+        # Let R = k'G.
+        R = G*kp
+        # Let k = k' if jacobi(y(R)) = 1, otherwise let k = n - k' .
+        k = n-kp if (R.y & 1) else k
+        # Let e = int(hash(bytes(x(R)) || bytes(dG) || m)) mod n.
+        dg = G*pv_key.d
+        e = int.from_bytes(
+            self._hasher(
+                R.x.to_bytes(size, "little") + \
+                (2 + dg.y&1).to_bytes(size, "little") + dg.x.to_bytes(size, "little") + \
+                msg).digest(),
+            "little"
+        ) % n
+
+        # The signature is bytes(x(R)) || bytes((k + ed) mod n).
+        r = R.x % n
+        s = (k + e*pv_key.d) % n
+        return encode_sig(r, s, self.fmt, 0 if self.fmt not in ["RAW", "EDDSA"] else size)
+
     def _do_sign(self, msg, pv_key, k):
         if (pv_key.curve == None):
-            raise ECPyException('private key haz no curve')
+            raise ECPyException('private key has no curve')
         curve = pv_key.curve
         n     = curve.order
         G     = curve.generator
@@ -216,7 +251,7 @@ class ECSchnorr:
         elif self.option == "LIBSECP":
             if Q.y & 1:
                 k = n-k
-                Q = G*k
+                # Q = G*k
             r = (Q.x%n).to_bytes(size,'big')
             hasher.update(r+msg)
             h = hasher.digest()
