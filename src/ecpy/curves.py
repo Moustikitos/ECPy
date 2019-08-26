@@ -878,6 +878,16 @@ class Point:
     def eq(self,Q):
         return self.__eq__(Q)
 
+    def serialize(self, compressed=True):
+        size = self.curve.size >> 3
+        first = self.x.to_bytes(size, "big")
+        last = self.y.to_bytes(size, "big")
+        if compressed:
+            # check if last digit of second part is even (2%2 = 0, 3%2 = 1)
+            even = not bool(bytearray(last)[-1] % 2)
+            return (b"\x02" if even else b"\x03") + first
+        else:
+            return b"\x01" + first + last
 
 
 class ECPyException(Exception):

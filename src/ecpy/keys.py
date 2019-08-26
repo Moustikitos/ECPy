@@ -39,6 +39,10 @@ class ECPublicKey:
     def __str__(self):
         return "ECPublicKey:\n  x: %x\n  y: %x" % (self.W.x,self.W.y)
         
+    def serialize(self, compressed=True):
+        return self.W.serialize(compressed)
+    
+
 class ECPrivateKey:
     """ Public EC key.
     
@@ -53,7 +57,7 @@ class ECPrivateKey:
        curve (Curve) : curve
     """
     
-    def __init__(self, d,curve):
+    def __init__(self, d, curve):
         self.d = int(d)
         self.curve = curve
     
