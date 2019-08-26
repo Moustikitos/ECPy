@@ -306,6 +306,7 @@ class ECSchnorr:
             s = (k + e*pv_key.d) % n
         
         return encode_sig(r, s, self.fmt, 0 if self.fmt not in ["RAW", "EDDSA"] else size)
+
             
     def verify(self,msg,sig,pu_key):
         """ Verifies a message signature.                
