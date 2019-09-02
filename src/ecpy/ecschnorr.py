@@ -165,7 +165,7 @@ class ECSchnorr:
         """
         return self._do_sign(msg, pv_key, k)
 
-    def sign_rfc6979(self, msg, pv_key, hasher=None, canonical=False):
+    def sign_rfc6979(self, msg, pv_key, hasher=None):
         """ Signs a message hash according to RFC6979 
         Args:
             msg (bytes)                    : the message hash to sign
@@ -181,47 +181,23 @@ class ECSchnorr:
                 return sig
             return None
 
+    # https://github.com/vihu/schnorr-python/blob/master/naive.py
     def sign_secp256k1(self, msg, pv_key, algo16=b""):
         """
-        Specific signature for SECP256K1 curve:
-        # https://github.com/vihu/schnorr-python/blob/master/naive.py
+        Specific signature for SECP256K1 curve.
         Args:
             msg (bytes)                    : the message hash to sign
             pv_key (ecpy.keys.ECPrivateKey): key to use for signing
         """
         if pv_key.curve.name != 'secp256k1':
             raise ECPyException("specific 'secp256k1' curve signature")
+
         size = pv_key.curve.size >> 3
         data = pv_key.d.to_bytes(size, "big") + msg + algo16[:16]
         k = int.from_bytes(self._hasher(data).digest(), "big")
         if k == 0:
             raise ECPyException("signature failed")
         return self._do_sign(msg, pv_key, k)
-
-    # def sign_secp256k1(self, msg, pv_key, algo16=b""):
-    #     """
-    #     Specific signature for SECP256K1 curve:
-    #     https://github.com/sipa/bips/blob/bip-schnorr/bip-schnorr.mediawiki
-
-    #     Args:
-    #         msg (bytes)                    : the message hash to sign
-    #         pv_key (ecpy.keys.ECPrivateKey): key to use for signing
-    #     """
-    #     if pv_key.curve.name != 'secp256k1':
-    #         raise ECPyException("specific 'secp256k1' curve signature")
-
-    #     n = pv_key.curve.order
-    #     size = pv_key.curve.size >> 3
-
-    #     # Let P = dG
-    #     P = pv_key.curve.generator*pv_key.d
-    #     # Let k = int(hash(bytes(d) || m)) mod
-    #     data = pv_key.d.to_bytes(size, "big") + msg + algo16[:16]
-    #     k = int.from_bytes(self._hasher(data).digest(), "big") % n
-    #     # Fail if k = 0
-    #     if k == 0:
-    #         raise ECPyException("signature failed")
-    #     return self._do_sign(msg, pv_key, k)
 
     def _do_sign(self, msg, pv_key, k):
         if (pv_key.curve == None):
@@ -298,24 +274,6 @@ class ECSchnorr:
             e = int.from_bytes(hasher.digest(), "big")
             r = Q.x % n
             s = (k + e*pv_key.d) % n
-
-        # # https://github.com/sipa/bips/blob/bip-schnorr/bip-schnorr.mediawiki
-        # elif self.option == "SECP256K1":
-        #     # R = Q...
-        #     # Let k = k' if jacobi(y(R)) = 1, otherwise let k = n - k'
-        #     k = k if _jacobi(Q.y, pv_key.curve.field) == 1 else n-k
-        #     # Let P = d'G
-        #     P = G*pv_key.d
-        #     # Let e = int(hash(bytes(R) || bytes(P) || m)) mod n
-        #     e = int.from_bytes(
-        #         self._hasher(
-        #             Q.x.to_bytes(size, "big") + P.serialize() + msg
-        #         ).digest(),
-        #         "big"
-        #     ) % n
-        #     # The signature is bytes(R) || bytes((k + ed) mod n)
-        #     r = Q.x % n
-        #     s = (k + e*pv_key.d) % n
         
         return encode_sig(r, s, self.fmt, 0 if self.fmt not in ["RAW", "EDDSA"] else size)
             
