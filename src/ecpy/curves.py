@@ -20,13 +20,17 @@
 .. moduleauthor:: Cédric Mesnil <cedric.mesnil@ubinity.com>
 
 """
+import future
 
 #python 2 compatibility
 from builtins import int,pow
+try:
+    from builtins import long
+except ImportError:
+    long = int
 
 import binascii
 import random
-
 
 
 def decode_scalar_25519(k):
@@ -83,7 +87,6 @@ class Curve:
        order (int)      : order of generator
 
     """
-    
 
     @staticmethod
     def get_curve(name):
@@ -116,7 +119,6 @@ class Curve:
           tuple:  list of names as str
         """
         return [c['name'] for c in curves]
-        
     
     def __init__(self,parameters):        
         raise NotImplementedError('Abstract method __init__')
@@ -128,7 +130,6 @@ class Curve:
         x = self._domain['generator'][0]
         y = self._domain['generator'][1]
         self._domain['generator'] = Point(x,y,self)
-
         
     def __getattr__(self, name):
         if name in self._domain:
@@ -829,6 +830,20 @@ class Point:
     def curve(self):
         return self._curve
         
+    @staticmethod
+    def from_hex(hex, curve):
+        # ref : https://bitcointalk.org/index.php?topic=644919.msg7205689#msg7205689
+        if isinstance(curve, str):
+            curve = Curve.get_curve(curve)
+        p = curve.field
+        y_parity = int(pubkey[:2], 16) - 2
+        x = int(pubkey[2:], 16)
+        a = (pow(x, 3, p) + 7) % p
+        y = pow(a, (p + 1) // 4, p)
+        if y % 2 != y_parity:
+            y = -y % p
+        return Point(x, y, curve, check=True)
+
     def __neg__(self):
         curve = self.curve
         return Point(self.x,curve.field-self.y,curve)
@@ -844,7 +859,7 @@ class Point:
         raise NotImplementedError('__sub__: type not supported: %s'%type(Q))
 
     def __mul__(self, scal):
-        if isinstance(scal,int):
+        if isinstance(scal, (int, long)):
             return self.curve.mul_point(scal,self)
         raise NotImplementedError('__mul__: type not supported: %s'%type(scal))
 

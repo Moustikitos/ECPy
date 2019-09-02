@@ -13,9 +13,10 @@
 # limitations under the License.
 
 #python 2 compatibility
-from builtins import int,pow
-
+import future
+from builtins import int, pow
 import ecpy.curves
+
 
 class ECPublicKey:
     """ Public EC key.
@@ -35,6 +36,10 @@ class ECPublicKey:
     @property
     def curve(self):
         return self.W.curve
+
+    @staticmethod
+    def from_hex(hex, curve):
+        return ECPublicKey(ecpy.curves.Point.from_hex(hex, curve))
 
     def __str__(self):
         return "ECPublicKey:\n  x: %x\n  y: %x" % (self.W.x,self.W.y)
