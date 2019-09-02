@@ -38,14 +38,14 @@ class ECPublicKey:
         return self.W.curve
 
     @staticmethod
-    def from_hex(hex, curve):
-        return ECPublicKey(ecpy.curves.Point.from_hex(hex, curve))
+    def from_encoded_point(curve, data):
+        return ECPublicKey(curve.decode_point(data))
 
     def __str__(self):
         return "ECPublicKey:\n  x: %x\n  y: %x" % (self.W.x,self.W.y)
         
-    def serialize(self, compressed=True):
-        return self.W.serialize(compressed)
+    def encode_point(self, compressed=True):
+        return self.curve.encode_point(self.W, compressed)
     
 
 class ECPrivateKey:

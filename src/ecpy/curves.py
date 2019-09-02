@@ -355,19 +355,19 @@ class WeierstrassCurve(Curve):
             P: point to encode
 
         Returns
-           bytes : encoded point [04 | x | y] or [02 | x | sign] 
+           bytes : encoded point [04 | x | y] or [02 U 03 | x] 
         """
-        size = self.size>>3
+
+        size = self.size >> 3
         x = bytearray(P.x.to_bytes(size,'big'))
         y = bytearray(P.y.to_bytes(size,'big'))
         if compressed:
-            y = [P.y&1]
-            enc = [2]
+            enc = [2 if not P.y&1 else 3]
+            enc.extend(x)
         else:
             enc = [4]
-        enc.extend(x)
-        enc.extend(y)
-        return enc
+            enc.extend(y)
+        return bytearray(enc)
 
     def decode_point(self, eP):
         """ Decodes a point P according to *P1363-2000*.
@@ -379,11 +379,11 @@ class WeierstrassCurve(Curve):
            Point : decoded point
         """
         size = self.size>>3
-        xy    =  bytearray(eP)
-        if xy[0] == 2:
+        xy   = bytearray(eP)
+        if xy[0] in [2, 3]:
             x = xy[1:1+size]
             x = int.from_bytes(x,'big')
-            y = self.y_recover(x,xy[1+size])  
+            y = self.y_recover(x, 0 if xy[0] == 2 else 1)  
         elif xy[0] == 4:
             x = xy[1:1+size]
             x = int.from_bytes(x,'big')    
@@ -391,9 +391,7 @@ class WeierstrassCurve(Curve):
             y = int.from_bytes(y,'big')    
         else:
             raise ECPyException("Invalid encoded point")
-        
         return Point(x,y,self,False)
-        
         
     @staticmethod
     def _aff2jac(x,y, q):
@@ -829,21 +827,7 @@ class Point:
     @property
     def curve(self):
         return self._curve
-        
-    @staticmethod
-    def from_hex(hex, curve):
-        # ref : https://bitcointalk.org/index.php?topic=644919.msg7205689#msg7205689
-        if isinstance(curve, str):
-            curve = Curve.get_curve(curve)
-        p = curve.field
-        y_parity = int(pubkey[:2], 16) - 2
-        x = int(pubkey[2:], 16)
-        a = (pow(x, 3, p) + 7) % p
-        y = pow(a, (p + 1) // 4, p)
-        if y % 2 != y_parity:
-            y = -y % p
-        return Point(x, y, curve, check=True)
-
+    
     def __neg__(self):
         curve = self.curve
         return Point(self.x,curve.field-self.y,curve)
@@ -892,17 +876,6 @@ class Point:
     
     def eq(self,Q):
         return self.__eq__(Q)
-
-    def serialize(self, compressed=True):
-        size = self.curve.size >> 3
-        first = self.x.to_bytes(size, "big")
-        last = self.y.to_bytes(size, "big")
-        if compressed:
-            # check if last digit of second part is even (2%2 = 0, 3%2 = 1)
-            even = not bool(bytearray(last)[-1] % 2)
-            return (b"\x02" if even else b"\x03") + first
-        else:
-            return b"\x01" + first + last
 
 
 class ECPyException(Exception):
