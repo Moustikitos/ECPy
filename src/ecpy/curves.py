@@ -75,28 +75,27 @@ class Curve:
 
     Supported well know elliptic curve are:
        - Short Weierstrass form:  y²=x³+a*x+b
-       - Twisted Edward          a*x²+y2=1+d*x²*y²
+       - Twisted Edward:          a*x²+y2=1+d*x²*y²
 
     Attributes:
-       name (str)       : curve name, the one given to get_curve or return by get_curve_names
-       size (int)       : bit size of curve
-       a (int)          : first curve parameter
-       b d (int)        : second curve parameter
-       field (int)      : curve field
-       generator (Point): curve point generator
-       order (int)      : order of generator
-
+        name (str)       : curve name, the one given to get_curve or return by get_curve_names
+        size (int)       : bit size of curve
+        a (int)          : first curve parameter
+        b d (int)        : second curve parameter
+        field (int)      : curve field
+        generator (Point): curve point generator
+        order (int)      : order of generator
     """
 
     @staticmethod
     def get_curve(name):
         """Return a Curve object  according to its name
         
-       Args:
-           name (str) : curve name to retrieve
+        Args:
+            name (str) : curve name to retrieve
 
-       Returns:
-           Curve:          Curve object
+        Returns:
+            Curve :      Curve object
         """
         
         l = [c for c in curves if c['name']==name]
@@ -116,7 +115,7 @@ class Curve:
         """ Returns all known curve names
 
         Returns: 
-          tuple:  list of names as str
+            tuple:  list of names as str
         """
         return [c['name'] for c in curves]
     
@@ -149,12 +148,11 @@ class Curve:
 
         Returns:
             bool: True if P is on curve, False else
-
         """        
         raise NotImplementedError('Abstract method is_on_curve')
 
     def add_point(self, P,Q):
-        """ Returns the sum of P and Q
+        """Returns the sum of P and Q
 
         This function ignores the default curve attach to P and Q, 
         and assumes P and Q are on this curve.
@@ -167,13 +165,13 @@ class Curve:
             Point: A new Point R = P+Q
 
         Raises:
-             ECPyException : with "Point not on curve", if Point R is not on \
-             curve,  thus meaning either P or Q was not on.
+            ECPyException : with "Point not on curve", if Point R is not on \
+            curve, thus meaning either P or Q was not on.
         """        
         raise NotImplementedError('Abstract method add_point')
     
     def sub_point(self, P,Q):
-        """ Returns the difference of P and Q
+        """Returns the difference of P and Q
 
         This function ignores the default curve attach to P and Q, 
         and assumes P and Q are on this curve.
@@ -186,14 +184,14 @@ class Curve:
             Point: A new Point R = P-Q
 
         Raises:
-             ECPyException : with "Point not on curve", if Point R is not on \
-             curve,  thus meaning either P or Q was not on.
+            ECPyException : with "Point not on curve", if Point R is not on \
+            curve, thus meaning either P or Q was not on.
         """        
         return self.add_point(P,Q.neg())
 
             
     def mul_point(self, k, P):
-        """ Returns the scalar multiplication  P with k.
+        """Returns the scalar multiplication  P with k.
 
         This function ignores the default curve attach to P and Q, 
         and assumes P and Q are on this curve.
@@ -208,24 +206,20 @@ class Curve:
         Raises:
             ECPyException : with "Point not on curve", if Point R is not 
             on curve, thus meaning P was not on.
-
         """        
         raise NotImplementedError('Abstract method mul_point')
 
     def encode_point(self, P):
-        """ encode/compress a point according to its curve"""
+        """encode/compress a point according to its curve"""
         raise NotImplementedError('Abstract method encode_point')
-        pass
 
     def decode_point(self, eP):
-        """ decode/decompress a point according to its curve"""
+        """decode/decompress a point according to its curve"""
         raise NotImplementedError('Abstract method _point decode_point')
-    
-        pass
 
     @staticmethod
     def _sqrt(n,p,sign=0):
-        """ Generic Tonelli–Shanks algorithm """
+        """Generic Tonelli–Shanks algorithm"""
         
         #check Euler criterion
         if pow(n,(p-1)//2,p) != 1:
@@ -284,7 +278,7 @@ class WeierstrassCurve(Curve):
         builder to ensure using supported curve.
 
         Args:
-           domain (dict): a dictionary providing curve parameters
+            domain (dict): a dictionary providing curve parameters
 
     """
     
