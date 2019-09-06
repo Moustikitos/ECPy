@@ -269,7 +269,6 @@ class ECSchnorr:
         # https://github.com/vihu/schnorr-python/blob/master/naive.py
         elif self.option == "SECP256K1":
             k = k if _jacobi(Q.y, pv_key.curve.field) == 1 else n-k
-            # data = Q.x.to_bytes(size, "big") + (G*pv_key.d).serialize() + msg
             data = Q.x.to_bytes(size, "big") + curve.encode_point(G*pv_key.d) + msg
             hasher.update(data)
             e = int.from_bytes(hasher.digest(), "big")
@@ -360,7 +359,6 @@ class ECSchnorr:
         elif self.option == "SECP256K1":
             if r >= pu_key.curve.field or s >= n:
                 return False
-            # hasher.update(r.to_bytes(size, "big") + pu_key.serialize() + msg)
             hasher.update(r.to_bytes(size, "big") + curve.encode_point(pu_key.W) + msg)
             e = int.from_bytes(hasher.digest(), "big")
             Q = s*G + (n-e)*pu_key.W

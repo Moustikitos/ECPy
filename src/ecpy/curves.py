@@ -347,21 +347,20 @@ class WeierstrassCurve(Curve):
         
         Args:
             P: point to encode
-
         Returns
-           bytes : encoded point [04 | x | y] or [02 U 03 | x] 
+           bytes : encoded point [04 | x | y] or [02 | x | sign] 
         """
-
-        size = self.size >> 3
+        size = self.size>>3
         x = bytearray(P.x.to_bytes(size,'big'))
         y = bytearray(P.y.to_bytes(size,'big'))
         if compressed:
-            enc = [2 if not P.y&1 else 3]
-            enc.extend(x)
+            y = [P.y&1]
+            enc = [2]
         else:
             enc = [4]
-            enc.extend(y)
-        return bytearray(enc)
+        enc.extend(x)
+        enc.extend(y)
+        return bytes(bytearray(enc))
 
     def decode_point(self, eP):
         """ Decodes a point P according to *P1363-2000*.
@@ -373,11 +372,11 @@ class WeierstrassCurve(Curve):
            Point : decoded point
         """
         size = self.size>>3
-        xy   = bytearray(eP)
-        if xy[0] in [2, 3]:
+        xy    =  bytearray(eP)
+        if xy[0] == 2:
             x = xy[1:1+size]
             x = int.from_bytes(x,'big')
-            y = self.y_recover(x, 0 if xy[0] == 2 else 1)  
+            y = self.y_recover(x,xy[1+size])  
         elif xy[0] == 4:
             x = xy[1:1+size]
             x = int.from_bytes(x,'big')    
@@ -385,6 +384,7 @@ class WeierstrassCurve(Curve):
             y = int.from_bytes(y,'big')    
         else:
             raise ECPyException("Invalid encoded point")
+        
         return Point(x,y,self,False)
         
     @staticmethod
@@ -870,6 +870,49 @@ class Point:
     
     def eq(self,Q):
         return self.__eq__(Q)
+
+    def to_bytes(self, compressed=True):
+        """ Point serialisation.
+        Serialization is the standard one:
+        
+        - O2 x    for even x in compressed form
+        - 03 x    for odd x in compressed form
+        - 04 x y  for uncompressed form
+        """
+        if compressed:
+            b = self.x.to_bytes(self.curve.size>>3,'big')
+            if self.y & 1:
+                b = b"\x03"+b
+            else:
+                b = b"\x02"+b
+        else:
+            b = b"\x04"+self.x.to_bytes(32,'big')+self.y.to_bytes(32,'big')
+        return b
+
+    @staticmethod
+    def from_bytes(data, curve):
+        """ Decodes a point P according to *P1363-2000*.
+        
+        Args:
+            eP (bytes)    : encoded point
+            curve (Curve) : curve on witch point is
+        Returns
+           Point : decoded point
+        """
+        size = curve.size>>3
+        xy   = bytearray(data)
+        if xy[0] in [2, 3]:
+            x = xy[1:1+size]
+            x = int.from_bytes(x, 'big')
+            y = curve.y_recover(x, 0 if xy[0] == 2 else 1)  
+        elif xy[0] == 4:
+            x = xy[1:1+size]
+            x = int.from_bytes(x,'big')    
+            y = xy[1+size:1+size+size]
+            y = int.from_bytes(y,'big')    
+        else:
+            raise ECPyException("Invalid encoded point")
+        return Point(x,y,curve,False)
 
 
 class ECPyException(Exception):
