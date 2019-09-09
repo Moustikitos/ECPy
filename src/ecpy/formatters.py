@@ -25,7 +25,7 @@ def encode_sig(r,s,fmt="DER",size=0) :
     Args:
         r (int):   r value
         s (int):   s value
-        fmt (str): 'DER'|'BTUPLE'|'ITUPLE'|'RAW'|'EDDSA
+        fmt (str): 'DER'|'BTUPLE'|'ITUPLE'|'RAW'|'EDDSA'
 
     Returns:
          bytes:  TLV   for DER encoding

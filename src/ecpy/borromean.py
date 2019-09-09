@@ -25,55 +25,52 @@ from ecpy.formatters import decode_sig, encode_sig, list_formats
 from ecpy            import ecrand
 from ecpy.curves     import ECPyException
 
-def _h(b):
-    return binascii.hexlify(b)
 
-def _point_to_bytes(point, compressed = True):
-    """ Point serialisation.
-    
-    Serialization is the standard one:
-    
-    - O2 x    for even x in compressed form
-    - 03 x    for odd x in compressed form
-    - 04 x y  for uncompressed form
-    
-    
+# def _h(b):
+#     return binascii.hexlify(b)
+
+
+def _point_to_bytes(point, compressed=True):
+    """
+    Standart point serialisation
+     - O2 x    for even x in compressed form
+     - 03 x    for odd x in compressed form
+     - 04 x y  for uncompressed form
+
+    Args:
+        point (ecpy.keys.ECPublicKey) curve point to convert
+
+    Returns
+        bytes
     """
     if compressed:
-        b = point.x.to_bytes(32,'big')
-        if point.y & 1:
-            b = b"\x03"+b
-        else:
-            b = b"\x02"+b
+        return (b"\x03" if point.y & 1 else b"\x02") + point.x.to_bytes(32,'big')
     else:
-        b = b"\x04"+point.x.to_bytes(32,'big')+point.y.to_bytes(32,'big')
-    return b
+        return b"\x04" + point.x.to_bytes(32,'big') + point.y.to_bytes(32,'big')
 
-def _borromean_hash(m,e,i,j, H):
+
+def _borromean_hash(m, e, i, j, hasher):
     """
     All params are bytes.
-    
-    m: bytes     message
-    e: bytes     point
-    i: int       ring index
-    j: int       secret index
+
+    Args:
+        m (bytes)         : message
+        e (bytes)         : point
+        i (int)           : ring index
+        j (int)           : secret index
+        hasher (callable) : hasher method
+
+    Returns:
+        bytes
     """
-    i = int(i).to_bytes(4,'big')
-    j = int(j).to_bytes(4,'big')              
-    sha256 = H()
-    sha256.update(e)
-    sha256.update(m)
-    sha256.update(i)
-    sha256.update(j)
-    d = sha256.digest()
-    return d
+    return hasher(e + m + int(i).to_bytes(4,'big') + int(j).to_bytes(4,'big')).digest()
+
 
 class Borromean:
-    """ Borromean Ring signer implementation according to:
-      
-    https://github.com/Blockstream/borromean_paper/blob/master/borromean_draft_0.01_9ade1e49.pdf
-
-    https://github.com/ElementsProject/secp256k1-zkp/blob/secp256k1-zkp/src/modules/rangeproof/borromean_impl.h
+    """
+    Borromean Ring signer implementation according to:
+     - https://github.com/Blockstream/borromean_paper/blob/master/borromean_draft_0.01_9ade1e49.pdf
+     - https://github.com/ElementsProject/secp256k1-zkp/blob/secp256k1-zkp/src/modules/rangeproof/borromean_impl.h
 
     ElementsProject implementation has some tweaks compared to PDF. This implementation is ElementsProject compliant.
 
@@ -83,14 +80,14 @@ class Borromean:
         fmt (str) : in/out signature format. See :mod:`ecpy.formatters`. IGNORED.
     """
 
-
-    def __init__(self,  fmt="BTUPLE") :
+    def __init__(self, fmt="BTUPLE"):
         self.fmt = fmt
         self._curve = Curve.get_curve('secp256k1')
         self._hash = hashlib.sha256
-        
+    
     def sign(self, msg, rings, pv_keys, pv_keys_index):
-        """ Signs a message hash.
+        """
+        Signs a message hash.
 
         The public `rings` argument is a tuple of public key array. In other 
         words each element of the ring tuple is an array containing the  public
@@ -100,71 +97,72 @@ class Borromean:
         the corresponding public key is specified by its index in the ring.
       
         Exemple:
-            let r1 be the first ring with 2 keys:    pu11, pu12
-            let 21 be the second ring with 3 keys:   pu21,pu22,pu23
-            let say we want to produce a signature with sec12 and sec21 
-            `sign` should be called as::
+            let r1 be the first ring with 2 keys:  pu11, pu12
+            let 21 be the second ring with 3 keys: pu21,pu22,pu23
+            let say we want to produce a signature with sec12 and sec21
+            `sign` should be called as:
 
-                borromean.sign(m, 
-                              ([pu11,pu12],[pu21,pu22,pu23]), 
-                              [sec12, sec21], [1,0])
+                borromean.sign(
+                    m, 
+                    ([pu11,pu12],[pu21,pu22,pu23]), 
+                    (sec12, sec21),
+                    (1,0)
+                )
 
         The return value is a tuple (e0, [s0,s1....]). Each value is encoded
         as binary (bytes).
         
         Args:
-            msg (bytes)                              : the message hash to sign
-            rings (tuple of (ecpy.keys.ECPublicKey[]): public key rings
-            pv_keys (ecpy.keys.ECPrivateKey[])       : key to use for signing
-            pv_keys_index (int[])                    :
+            msg (bytes)                                  : the message hash to sign
+            rings (tuple of ecpy.keys.ECPublicKey rings) : public key rings
+            pv_keys (ecpy.keys.ECPrivateKey tuple)       : key to use for signing
+            pv_keys_index (tuple of int)                 : 
 
         Returns:
             (e0, [s0,s1....]) : signature
         """
-        #shorcuts
+        # shorcuts
         G     = self._curve.generator
         order = self._curve.order
-
-        #set up locals
+        # set up locals
         ring_count = len(rings)
         privkeys = pv_keys
         pubkeys = []
         rsizes = []
         for r in rings:
-            pubkeys = pubkeys+r
+            pubkeys = pubkeys + r
             rsizes.append(len(r))
         e0 = None
         s  = [None]*len(pubkeys)
-        k  = [None]*len(rings)
-            
-        #step2-3
+        k  = [None]*len(rings)  
+        # step 2 - 3
         r0 = 0
         sha256_e0 = self._hash()
-        for i in range (0,ring_count):
-            k[i] = random.randint(1,order)
+        for i in range(0, ring_count):
+            k[i] = random.randint(1, order)
             kiG = k[i]*G
             j0 = pv_keys_index[i]
             e_ij = _point_to_bytes(kiG)               
             for j in range(j0+1, rsizes[i]):
-                s[r0+j] = random.randint(1,order)
-                e_ij = _borromean_hash(m,e_ij,i,j, self._hash) 
-                e_ij = int.from_bytes(e_ij,'big')
+                s[r0+j] = random.randint(1, order)
+                e_ij = _borromean_hash(m, e_ij, i, j, self._hash) 
+                e_ij = int.from_bytes(e_ij, 'big')
                 sG_eP = s[r0+j]*G + e_ij*pubkeys[r0+j].W
                 e_ij = _point_to_bytes(sG_eP)
             sha256_e0.update(e_ij)
             r0 += rsizes[i]
         sha256_e0.update(m)
         e0 =  sha256_e0.digest()    
-        #step 4
+        # step 4
         r0 = 0
         for i in range (0, ring_count):
             j0 = pv_keys_index[i]
-            e_ij = _borromean_hash(m,e0,i,0, self._hash)
+            e_ij = _borromean_hash(m, e0, i, 0, self._hash)
             e_ij = int.from_bytes(e_ij,'big')
             for j in range(0, j0):
-                s[r0+j] = random.randint(1,order)           
+                s[r0+j] = random.randint(1, order)           
                 sG_eP = s[r0+j]*G + e_ij*pubkeys[r0+j].W
-                e_ij = _borromean_hash(m,_point_to_bytes(sG_eP),i,j+1, self._hash)
+                e_ij = _borromean_hash(m, _point_to_bytes(sG_eP), i, j+1, self._hash)
                 e_ij = int.from_bytes(e_ij,'big')
             s[r0+j0] = (k[i]-privkeys[i].d*e_ij)%order
             r0 += rsizes[i]
@@ -172,39 +170,40 @@ class Borromean:
         return (e0,s)
 
     def verify(self, msg, sig, rings):
-        """ Verifies a message signature.                
+        """
+        Verifies a message signature.                
 
         Args:
             msg (bytes)             : the message hash to verify the signature
             sig (bytes)             : signature to verify
-            rings (key.ECPublicKey): key to use for verifying
+            rings (key.ECPublicKey) : key to use for verifying
 
         Returns:
             boolean : True if signature is verified, False else
         """
-         #shortcuts
+        # shortcuts
         G     = self._curve.generator
-        #set up locals
+        # set up locals
         ring_count = len(rings)
         pubkeys = []
         rsizes = []
         for r in rings:
-            pubkeys = pubkeys+r
+            pubkeys = pubkeys + r
             rsizes.append(len(r))
-        #verify
+        # verify
         e0 = sig[0]
         s = sig[1]
         sha256_e0 = self._hash()
         r0 = 0
-        for i in range (0,ring_count):
-            e_ij = _borromean_hash(m,e0,i,0, self._hash) 
+        for i in range (0, ring_count):
+            e_ij = _borromean_hash(m, e0, i, 0, self._hash) 
             for j in range(0,rsizes[i]):
-                e_ij = int.from_bytes(e_ij,'big')
-                s_ij = int.from_bytes(s[r0+j],'big')
+                e_ij = int.from_bytes(e_ij, 'big')
+                s_ij = int.from_bytes(s[r0+j], 'big')
                 sG_eP = s_ij*G + e_ij*pubkeys[r0+j].W
                 e_ij = _point_to_bytes(sG_eP)
                 if j != rsizes[i]-1:
-                    e_ij = _borromean_hash(m,e_ij,i,j+1, self._hash) 
+                    e_ij = _borromean_hash(m, e_ij, i, j+1, self._hash) 
                 else:
                     sha256_e0.update(e_ij)
             r0 += rsizes[i]
@@ -223,34 +222,17 @@ if __name__ == "__main__":
             print("s%d: %s"%(i,h(s)))
             i += 1
     try:
-
-        #
-        # layout: 
-        # nrings = 2
-        #   ring 1 has 2 keys
-        #   ring 2 has 3 keys
-        #
-        # pubs=[ring1-key1, ring1-key2,   
-        #       ring2-key1, ring2-key2, ring2-key3]
-        # 
-        # k = [ring1-rand, ring2-rand]
-        # sec = [ring1-sec2, ring2-sec1]
-        # rsizes = [2,3]
-        # secidx = [1,0]
-        # 
-        #
-
-        cv     = Curve.get_curve('secp256k1')
+        cv      = Curve.get_curve('secp256k1')
         
-        seckey0  = ECPrivateKey(0xf026a4e75eec75544c0f44e937dcf5ee6355c7176600b9688c667e5c283b43c5, cv)
-        seckey1  = ECPrivateKey(0xf126a4e75eec75544c0f44e937dcf5ee6355c7176600b9688c667e5c283b43c5, cv)
-        seckey2  = ECPrivateKey(0xf226a4e75eec75544c0f44e937dcf5ee6355c7176600b9688c667e5c283b43c5, cv)
-        seckey3  = ECPrivateKey(0xf326a4e75eec75544c0f44e937dcf5ee6355c7176600b9688c667e5c283b43c5, cv)
-        seckey4  = ECPrivateKey(0xf426a4e75eec75544c0f44e937dcf5ee6355c7176600b9688c667e5c283b43c5, cv)
-        seckey5  = ECPrivateKey(0xf526a4e75eec75544c0f44e937dcf5ee6355c7176600b9688c667e5c283b43c5, cv)
-        seckey6  = ECPrivateKey(0xf626a4e75eec75544c0f44e937dcf5ee6355c7176600b9688c667e5c283b43c5, cv)
-        seckey7  = ECPrivateKey(0xf726a4e75eec75544c0f44e937dcf5ee6355c7176600b9688c667e5c283b43c5, cv)
-        seckey8  = ECPrivateKey(0xf826a4e75eec75544c0f44e937dcf5ee6355c7176600b9688c667e5c283b43c5, cv)
+        seckey0 = ECPrivateKey(0xf026a4e75eec75544c0f44e937dcf5ee6355c7176600b9688c667e5c283b43c5, cv)
+        seckey1 = ECPrivateKey(0xf126a4e75eec75544c0f44e937dcf5ee6355c7176600b9688c667e5c283b43c5, cv)
+        seckey2 = ECPrivateKey(0xf226a4e75eec75544c0f44e937dcf5ee6355c7176600b9688c667e5c283b43c5, cv)
+        seckey3 = ECPrivateKey(0xf326a4e75eec75544c0f44e937dcf5ee6355c7176600b9688c667e5c283b43c5, cv)
+        seckey4 = ECPrivateKey(0xf426a4e75eec75544c0f44e937dcf5ee6355c7176600b9688c667e5c283b43c5, cv)
+        seckey5 = ECPrivateKey(0xf526a4e75eec75544c0f44e937dcf5ee6355c7176600b9688c667e5c283b43c5, cv)
+        seckey6 = ECPrivateKey(0xf626a4e75eec75544c0f44e937dcf5ee6355c7176600b9688c667e5c283b43c5, cv)
+        seckey7 = ECPrivateKey(0xf726a4e75eec75544c0f44e937dcf5ee6355c7176600b9688c667e5c283b43c5, cv)
+        seckey8 = ECPrivateKey(0xf826a4e75eec75544c0f44e937dcf5ee6355c7176600b9688c667e5c283b43c5, cv)
         
         pubkey0 = seckey0.get_public_key()
         pubkey1 = seckey1.get_public_key()
@@ -269,7 +251,6 @@ if __name__ == "__main__":
         m = m.to_bytes(32,'big')
 
         borromean = Borromean()
-        
 
         for l in range(2,len(allpubs)):
             pubs = allpubs[:l]
@@ -296,11 +277,7 @@ if __name__ == "__main__":
                         e0 = e0[1:]+e0[:1]
                         sigma = (e0,sigma[1])
                         assert(not borromean.verify(m, sigma,  pubset))
-                        
-
-        
-
-            # ##OK!
+             
         print("All internal assert OK!")
     finally:
         pass
