@@ -660,7 +660,7 @@ class Point:
     
     def __init__(self, x, y, curve, check=True):  
         self._curve = curve
-        self._enc = encoders.Secp256k1(self._curve)
+        self._enc = (encoders.Secp256k1 if hasattr(self._curve, "y_recover") else encoders.Eddsa04)(self._curve)
         if x:
             self._x = int(x)
         if y :
@@ -756,7 +756,7 @@ class ECPyException(Exception):
 
 WEIERSTRASS   = "weierstrass"
 TWISTEDEDWARD = "twistededward"
-MONTGOMERY     = "montgomery"
+MONTGOMERY    = "montgomery"
 
 
 curves = [

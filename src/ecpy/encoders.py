@@ -59,6 +59,12 @@ class Secp256k1(Encoder):
     - 04 | x | y  for uncompressed form
     """
 
+    def _get_length(self, curve):
+        if curve.type == "twistededward":
+            raise Exception("not available within TWISTEDEDWARD curve")
+        else:
+            return curve.size >> 3
+
     def encode(self, x, y):
         length = self.length
         if self.compressed:
@@ -145,7 +151,7 @@ class P1363_2000(Encoder):
         elif xy[0] == 4:
             y = int.from_bytes(xy[1+length:], "big")
         else:
-            raise ECPyException("Invalid encoded point")
+            raise Exception("invalid encoded point")
         return x, y
 
 

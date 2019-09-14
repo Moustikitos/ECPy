@@ -76,7 +76,7 @@ class EDDSA:
         curve = pv_key.curve
         B     = curve.generator
         n     = curve.order
-        size  = curve._coord_size()
+        size  = curve.point_encoder.length
         
         k = pv_key.d.to_bytes(size,'big')
         hasher = hasher()
@@ -122,7 +122,7 @@ class EDDSA:
         curve = pv_key.curve
         B     = curve.generator
         n     = curve.order
-        size = curve._coord_size()
+        size  = curve.point_encoder.length
               
         a, A, prefix = EDDSA._get_materials(pv_key, self._hasher, self._hash_len)
         eA = curve.encode_point(A)
@@ -149,13 +149,13 @@ class EDDSA:
         hasher = self._hasher()
         if curve.name =='Ed448':  
             hasher.update(b'SigEd448\x00\x00')
-            hasher.update(eR)
-            hasher.update(eA)
+            hasher.update(bytearray(eR))
+            hasher.update(bytearray(eA))
             hasher.update(msg)
             H_eR_eA_m = hasher.digest(self._hash_len)
         elif  curve.name =='Ed25519':  
-            hasher.update(eR)
-            hasher.update(eA)
+            hasher.update(bytearray(eR))
+            hasher.update(bytearray(eA))
             hasher.update(msg)
             H_eR_eA_m = hasher.digest()
         else:
@@ -181,7 +181,7 @@ class EDDSA:
         """
         curve = pu_key.curve
         n     = curve.order
-        size  = curve._coord_size()
+        size  = curve.point_encoder.length
 
         eR,S = decode_sig(sig, self.fmt)
 
@@ -193,13 +193,13 @@ class EDDSA:
         eA = curve.encode_point(pu_key.W)
         if curve.name =='Ed448':
             hasher.update(b'SigEd448\x00\x00')
-            hasher.update(eR)
-            hasher.update(eA)
+            hasher.update(bytearray(eR))
+            hasher.update(bytearray(eA))
             hasher.update(msg)
             h = hasher.digest(self._hash_len)
         elif curve.name == 'Ed25519':
-            hasher.update(eR)
-            hasher.update(eA)
+            hasher.update(bytearray(eR))
+            hasher.update(bytearray(eA))
             hasher.update(msg)
             h = hasher.digest()
         else:
