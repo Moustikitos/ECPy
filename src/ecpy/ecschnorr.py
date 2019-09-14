@@ -18,7 +18,7 @@ from builtins import int, pow
 
 from ecpy.curves     import Curve,Point
 from ecpy.keys       import ECPublicKey, ECPrivateKey
-from ecpy.formatters import decode_sig, encode_sig, list_formats
+from ecpy.formatters import decode_sig, encode_sig, FORMATS
 from ecpy            import ecrand
 from ecpy.curves     import ECPyException
 
@@ -132,7 +132,7 @@ class ECSchnorr:
     def __init__(self, hasher, option="ISO", fmt="DER"):
         if not option in ("ISO","ISOx","BSI","LIBSECP","Z","SECP256K1"):
             raise ECPyException('ECSchnorr option not supported: %s'%option)
-        if not fmt in list_formats():
+        if not fmt in FORMATS:
             raise ECPyException('ECSchnorr format not supported: %s'%fmt)
 
         self._hasher = hasher
@@ -269,7 +269,7 @@ class ECSchnorr:
         # https://github.com/vihu/schnorr-python/blob/master/naive.py
         elif self.option == "SECP256K1":
             k = k if _jacobi(Q.y, pv_key.curve.field) == 1 else n-k
-            data = Q.x.to_bytes(size, "big") + curve.encode_point(G*pv_key.d) + msg
+            data = Q.x.to_bytes(size, "big") + (G*pv_key.d).encode(compressed=True) + msg
             hasher.update(data)
             e = int.from_bytes(hasher.digest(), "big")
             r = Q.x % n
@@ -359,7 +359,7 @@ class ECSchnorr:
         elif self.option == "SECP256K1":
             if r >= pu_key.curve.field or s >= n:
                 return False
-            hasher.update(r.to_bytes(size, "big") + curve.encode_point(pu_key.W) + msg)
+            hasher.update(r.to_bytes(size, "big") + pu_key.W.encode(compressed=True) + msg)
             e = int.from_bytes(hasher.digest(), "big")
             Q = s*G + (n-e)*pu_key.W
             if _jacobi(Q.y, pu_key.curve.field) != 1:
@@ -387,7 +387,7 @@ if __name__ == "__main__":
         R=0x5A79A0AA9B241E381A594B220554D096A5F09FA628AD9A33C3CE4393ADE1DEF7
         S=0x5C0EB78B67A513C3E53B2619F96855E291D5141C7CD0915E1D04B347457C9601
 
-        signer = ECSchnorr(hashlib.sha256,"ISO","ITUPLE")
+        signer = ECSchnorr(hashlib.sha256, "ISO", "ITUPLE")
         sig = signer.sign_k(msg,pv_key,k)
         assert(R==sig[0])
         assert(S==sig[1])
@@ -397,14 +397,14 @@ if __name__ == "__main__":
         R = 0xd7fb8135d8ea45e8fb3c9059f146e2630ef4bd51c4006a92edb4c8b0849963fb
         S = 0xb46d1525379e02e232d97928265b7254ea2ed97813454388c1a08f62dccd70b3
 
-        signer = ECSchnorr(hashlib.sha256,"ISOx","ITUPLE")
+        signer = ECSchnorr(hashlib.sha256, "ISOx", "ITUPLE")
         sig = signer.sign_k(msg,pv_key,k)
         assert(R==sig[0])
         assert(S==sig[1])
         assert(signer.verify(msg,sig,pu_key))
 
         ##BSI
-        signer = ECSchnorr(hashlib.sha256,"BSI","ITUPLE")
+        signer = ECSchnorr(hashlib.sha256, "BSI", "ITUPLE")
         sig = signer.sign_k(msg,pv_key,k)
         assert(signer.verify(msg,sig,pu_key))
 
@@ -416,7 +416,7 @@ if __name__ == "__main__":
         pu_key = pv_key.get_public_key()
         msg = int(0xb46d1525379e02e232d97928265b7254ea2ed97813454388c1a08f62dccd70b3)
         msg  = msg.to_bytes(32,'big')
-        signer = ECSchnorr(hashlib.sha256,"Z","ITUPLE")
+        signer = ECSchnorr(hashlib.sha256, "Z", "ITUPLE")
         sig = signer.sign_k(msg,pv_key,k)
         assert(signer.verify(msg,sig,pu_key))
 
@@ -435,7 +435,7 @@ if __name__ == "__main__":
         expect_r = 0x24653eac434488002cc06bbfb7f10fe18991e35f9fe4302dbea6d2353dc0ab1c
         expect_s = 0xacd417b277ab7e7d993cc4a601dd01a71696fd0dd2e93561d9de9b69dd4dc75c
         
-        signer = ECSchnorr(hashlib.sha256,"LIBSECP","ITUPLE")
+        signer = ECSchnorr(hashlib.sha256, "LIBSECP", "ITUPLE")
         sig = signer.sign_k(msg,pv_key,k)
         assert(expect_r == sig[0])
         assert(expect_s == sig[1])

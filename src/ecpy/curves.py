@@ -23,7 +23,7 @@
 import future
 
 #python 2 compatibility
-from builtins import int,pow
+from builtins import int, pow
 try:
     from builtins import long
 except ImportError:
@@ -32,59 +32,29 @@ except ImportError:
 import binascii
 import random
 
-
-def decode_scalar_25519(k):
-    """ decode scalar according to RF7748 and draft-irtf-cfrg-eddsa
-
-    Args:
-           k (bytes) : scalar to decode
-
-    Returns:
-          int: decoded scalar
-    """
-    k = bytearray(k)
-    k[0]  &= 0xF8
-    k[31] = (k[31] &0x7F) | 0x40
-    k = bytes(k)
-    k = int.from_bytes(k,'little')
-    return k
-
-def encode_scalar_25519(k):
-    """ encode scalar according to RF7748 and draft-irtf-cfrg-eddsa
-
-    Args:
-           k (int) : scalar to encode
-
-    Returns:
-          bytes: encoded scalar
-    """
-    k.to_bytes(32,'little')
-    k = bytearray(k)
-    k[0]  &= 0xF8
-    k[31] = (k[31] &0x7F) | 0x40
-    k = bytes(k)
-    return k
+from ecpy import encoders
 
 
 class Curve:
-    """Elliptic Curve abstraction
+    """
+    Elliptic Curve abstraction
 
     You should not directly create such Object.
     Use `get_curve` to get the predefined curve or create a well-know type
     of curve with your parameters
 
     Supported well know elliptic curve are:
-       - Short Weierstrass form:  y²=x³+a*x+b
-       - Twisted Edward:          a*x²+y2=1+d*x²*y²
+        - Short Weierstrass form:  y²=x³+a*x+b
+        - Twisted Edward:          a*x²+y2=1+d*x²*y²
 
     Attributes:
-        name (str)       : curve name, the one given to get_curve or return by get_curve_names
-        size (int)       : bit size of curve
-        a (int)          : first curve parameter
-        b d (int)        : second curve parameter
-        field (int)      : curve field
-        generator (Point): curve point generator
-        order (int)      : order of generator
+        - name (str)        : curve name, the one given to get_curve or return by get_curve_names
+        - size (int)        : bit size of curve
+        - a (int)           : first curve parameter
+        - b d (int)         : second curve parameter
+        - field (int)       : curve field
+        - generator (Point) : curve point generator
+        - order (int)       : order of generator
     """
 
     @staticmethod
@@ -95,9 +65,8 @@ class Curve:
             name (str) : curve name to retrieve
 
         Returns:
-            Curve :      Curve object
+            ecpy.curves.Curve
         """
-        
         l = [c for c in curves if c['name']==name]
         if len(l) == 0:
             return None
@@ -112,24 +81,29 @@ class Curve:
 
     @staticmethod    
     def get_curve_names():
-        """ Returns all known curve names
+        """
+        Returns all known curve names
 
         Returns: 
-            tuple:  list of names as str
+            tuple
         """
         return [c['name'] for c in curves]
     
-    def __init__(self,parameters):        
-        raise NotImplementedError('Abstract method __init__')
-    
+    def __init__(self, domain, point_encoder=encoders.Secp256k1):
+        self._domain = {}
+        self._set(domain, domain.keys()) #('name','type','size','a','b','field','generator','order','cofactor')
+        self.point_encoder = point_encoder(self, compressed=False)
+
     def _set(self, params, keys):
         for k in keys :
             self._domain[k] = params[k]
         self._domain['name'] = str(self._domain['name'])
-        x = self._domain['generator'][0]
-        y = self._domain['generator'][1]
-        self._domain['generator'] = Point(x,y,self)
-        
+        self._domain['generator'] = Point(
+            self._domain['generator'][0],
+            self._domain['generator'][1],
+            self
+        )
+
     def __getattr__(self, name):
         if name in self._domain:
             return self._domain[name]
@@ -139,53 +113,54 @@ class Curve:
         return str(self._domain).replace(',','\n')
 
     def is_on_curve(self, P):
-        """Check if P is on this curve 
+        """
+        Check if P is on this curve 
 
         This function ignores the default curve attach to P
     
         Args:
-            P (Point): Point to check
+            P (ecpy.curves.Point): Point to check
 
         Returns:
-            bool: True if P is on curve, False else
+            bool
         """        
         raise NotImplementedError('Abstract method is_on_curve')
 
-    def add_point(self, P,Q):
-        """Returns the sum of P and Q
+    def add_point(self, P, Q):
+        """
+        Returns the sum of P and Q
 
         This function ignores the default curve attach to P and Q, 
         and assumes P and Q are on this curve.
     
         Args:
-            P (Point): first  point to add
-            Q (Point): second point to add
+            P (ecpy.curves.Point): first  point to add
+            Q (ecpy.curves.Point): second point to add
 
         Returns:
-            Point: A new Point R = P+Q
+            ecpy.curves.Point: A new Point R = P+Q
 
         Raises:
-            ECPyException : with "Point not on curve", if Point R is not on \
-            curve, thus meaning either P or Q was not on.
+            ecpy.curves.ECPyException
         """        
         raise NotImplementedError('Abstract method add_point')
     
-    def sub_point(self, P,Q):
-        """Returns the difference of P and Q
+    def sub_point(self, P, Q):
+        """
+        Returns the difference of P and Q
 
         This function ignores the default curve attach to P and Q, 
         and assumes P and Q are on this curve.
     
         Args:
-            P (Point): first  point to subtract with
-            Q (Point): second point to subtract to
+            P (ecpy.curves.Point): first  point to subtract with
+            Q (ecpy.curves.Point): second point to subtract to
 
         Returns:
-            Point: A new Point R = P-Q
+            ecpy.curves.Point
 
         Raises:
-            ECPyException : with "Point not on curve", if Point R is not on \
-            curve, thus meaning either P or Q was not on.
+            ecpy.curves.ECPyException
         """        
         return self.add_point(P,Q.neg())
 
@@ -197,34 +172,32 @@ class Curve:
         and assumes P and Q are on this curve.
     
         Args:
-            P (Point): point to mul_point
+            P (ecpy.curves.Point): point to mul_point
             k (int)  : scalar to multiply
 
         Returns:
-            Point: A new Point R = k*Q
+            ecpy.curves.Point
 
         Raises:
-            ECPyException : with "Point not on curve", if Point R is not 
-            on curve, thus meaning P was not on.
+            ECPyException
         """        
         raise NotImplementedError('Abstract method mul_point')
 
-    def encode_point(self, P):
-        """encode/compress a point according to its curve"""
-        raise NotImplementedError('Abstract method encode_point')
+    def encode_point(self, P, compressed=False):
+        """Encode/compress a point according to its curve"""
+        self.point_encoder.compressed = compressed
+        return [int(e) for e in bytearray(self.point_encoder.encode(P.x, P.y))]
 
-    def decode_point(self, eP):
-        """decode/decompress a point according to its curve"""
-        raise NotImplementedError('Abstract method _point decode_point')
+    def decode_point(self, data):
+        """Decode/decompress a point according to its curve"""
+        return Point(*self.point_encoder.decode(bytearray(data), curve=self), curve=self, check=True)
 
     @staticmethod
-    def _sqrt(n,p,sign=0):
+    def _sqrt(n, p, sign=0):
         """Generic Tonelli–Shanks algorithm"""
-        
         #check Euler criterion
         if pow(n,(p-1)//2,p) != 1:
             return None
-
         #compute square root
         p_1 = p-1
         s = 0
@@ -262,35 +235,31 @@ class Curve:
 
     
 class WeierstrassCurve(Curve):
-    """An elliptic curve defined by the equation: y²=x³+a*x+b. 
-
-        The given domain must be a dictionary providing the following keys/values:
-              - name (str)         : curve unique name
-              - size (int)         : bit size
-              - a    (int)         : `a` equation coefficient
-              - b    (int)         : `b` equation coefficient
-              - field (inf)        : field value 
-              - generator (int[2]) : x,y coordinate of generator
-              - order (int)        : order of generator
-              - cofactor (int)     : cofactor
-        
-        *Note*: you should not use the constructor and only use :func:`Curve.get_curve`
-        builder to ensure using supported curve.
-
-        Args:
-            domain (dict): a dictionary providing curve parameters
-
     """
-    
-    def __init__(self,domain):
-        """ Built an new short Weierstrass curve with the provided parameters. """
-        self._domain = {}        
-        self._set(domain, ('name','type', 'size',
-                              'a','b','field','generator','order','cofactor'))
+    An elliptic curve defined by the equation: y²=x³+a*x+b. 
 
+    The given domain must be a dictionary providing the following keys/values:
+        - name (str)         : curve unique name
+        - size (int)         : bit size
+        - a    (int)         : `a` equation coefficient
+        - b    (int)         : `b` equation coefficient
+        - field (inf)        : field value 
+        - generator (int[2]) : x,y coordinate of generator
+        - order (int)        : order of generator
+        - cofactor (int)     : cofactor
     
+    *Note*: you should not use the constructor and only use :func:`Curve.get_curve`
+    builder to ensure using supported curve.
+
+    Args:
+        domain (dict) a dictionary providing curve parameters
+    """
+
+    def __init__(self, domain, point_encoder=encoders.P1363_2000):
+        Curve.__init__(self, domain, point_encoder)
+
     def is_on_curve(self, P):
-        """ See :func:`Curve.is_on_curve` """
+        """See :func:`Curve.is_on_curve`"""
         q     = self.field
         x     = P.x
         sq3x  = (x*x*x)%q
@@ -300,9 +269,8 @@ class WeierstrassCurve(Curve):
         right = (sq3x+self.a*x+self.b)%q
         return left == right
 
-
-    def add_point(self, P,Q):
-        """ See :func:`Curve.add_point` """
+    def add_point(self, P, Q):
+        """See :func:`Curve.add_point`"""
         q = self.field
         if (P == Q):
             Px,Py,Pz = self._aff2jac(P.x,P.y, q)
@@ -315,9 +283,8 @@ class WeierstrassCurve(Curve):
         PQ = Point(x,y, self)
         return PQ
 
-        
     def mul_point(self, k, P):
-        """ See :func:`Curve.mul_point` """
+        """See :func:`Curve.mul_point`"""
         q = self.field
         a = self.a
         x1,y1,z1 = self._aff2jac(P.x,P.y, q)
@@ -335,73 +302,37 @@ class WeierstrassCurve(Curve):
         x,y = self._jac2aff(x1,y1,z1, q)
         return Point(x,y,self)
 
-    def y_recover(self,x,sign=0):
-        """ """
+    def y_recover(self, x, sign=0):
+        """
+        Retrieves the y coordinate according to the y one,
+        such that point (x,y) is on curve.
+        
+        Args:
+            x (int)    x coordinate
+            sign (int) sign of y
+
+        Returns:
+           int
+        """
         p  = self.field
         y2 = (x*x*x + self.a*x + self.b)%p
         y  = self._sqrt(y2,p,sign)
         return y
-
-    def encode_point(self, P, compressed=False):
-        """ Encodes a point P according to *P1363-2000*.
-        
-        Args:
-            P: point to encode
-        Returns
-           bytes : encoded point [04 | x | y] or [02 | x | sign] 
-        """
-        size = self.size>>3
-        x = bytearray(P.x.to_bytes(size,'big'))
-        y = bytearray(P.y.to_bytes(size,'big'))
-        if compressed:
-            y = [P.y&1]
-            enc = [2]
-        else:
-            enc = [4]
-        enc.extend(x)
-        enc.extend(y)
-        return bytes(bytearray(enc))
-
-    def decode_point(self, eP):
-        """ Decodes a point P according to *P1363-2000*.
-        
-        Args:
-            eP (bytes)    : encoded point
-            curve (Curve) : curve on witch point is
-        Returns
-           Point : decoded point
-        """
-        size = self.size>>3
-        xy    =  bytearray(eP)
-        if xy[0] == 2:
-            x = xy[1:1+size]
-            x = int.from_bytes(x,'big')
-            y = self.y_recover(x,xy[1+size])  
-        elif xy[0] == 4:
-            x = xy[1:1+size]
-            x = int.from_bytes(x,'big')    
-            y = xy[1+size:1+size+size]
-            y = int.from_bytes(y,'big')    
-        else:
-            raise ECPyException("Invalid encoded point")
-        
-        return Point(x,y,self,False)
         
     @staticmethod
-    def _aff2jac(x,y, q):
+    def _aff2jac(x, y, q):
         return(x,y,1)
     
     @staticmethod
-    def _jac2aff(x,y,z, q):
+    def _jac2aff(x, y, z, q):
         invz = pow(z,q-2,q)
         sqinvz = (invz*invz)%q
         x = (x*sqinvz)%q
         y = (y*sqinvz*invz)%q
         return (x,y)
 
-    
     @staticmethod
-    def _dbl_jac(X1,Y1,Z1, q, a):
+    def _dbl_jac(X1, Y1, Z1, q, a):
         XX   = (X1*X1)%q
         YY   = (Y1*Y1)%q
         YYYY = (YY*YY)%q
@@ -415,7 +346,7 @@ class WeierstrassCurve(Curve):
         return X3,Y3,Z3
         
     @staticmethod
-    def _add_jac(X1,Y1,Z1, X2,Y2,Z2, q):
+    def _add_jac(X1, Y1, Z1, X2, Y2, Z2, q):
         Z1Z1 = (Z1*Z1)%q
         Z2Z2 = (Z2*Z2)%q
         U1   = (X1*Z2Z2)%q
@@ -449,26 +380,14 @@ class TwistedEdwardCurve(Curve):
         builder to ensure using supported curve.
         
         Args:
-           domain (dict): a dictionary providing curve domain parameters
+           domain (dict) a dictionary providing curve domain parameters
     """
 
-    def __init__(self,domain):
-        """ Built an new short twisted Edward curve with the provided parameters.  """
-        self._domain = {}
-        self._set(domain, ('name','type','size',
-                              'a','d','field','generator','order'))
-
-    def _coord_size(self):
-        if self.name == 'Ed25519':
-            size = 32
-        elif self.name == 'Ed448':
-            size = 57
-        else:
-            assert False, '%s not supported'%curve.name
-        return size
+    def __init__(self, domain, point_encoder=encoders.Eddsa04):
+        Curve.__init__(self, domain, point_encoder)
 
     def is_on_curve(self, P):
-        """ See :func:`Curve.is_on_curve` """
+        """See :func:`Curve.is_on_curve`"""
         q     = self.field
         x     = P.x
         sqx   = (x*x)%q
@@ -479,15 +398,16 @@ class TwistedEdwardCurve(Curve):
         return left == right
     
     def x_recover(self, y, sign=0):        
-        """ Retrieves the x coordinate according to the y one, \
-            such that point (x,y) is on curve.
+        """
+        Retrieves the x coordinate according to the y one,
+        such that point (x,y) is on curve.
         
         Args:
-            y (int): y coordinate
-            sign (int): sign of x
+            y (int)    y coordinate
+            sign (int) sign of x
 
         Returns:
-           int: the computed x coordinate
+           int
         """
         q = self.field
         a = self.a
@@ -495,7 +415,7 @@ class TwistedEdwardCurve(Curve):
         if sign:
             sign = 1
         
-        # #x2 = (y^2-1) * (d*y^2-a)^-1
+        # x2 = (y^2-1) * (d*y^2-a)^-1
         yy = (y*y)%q
         u = (1-yy)%q
         v = pow(a-d*yy,q-2,q)
@@ -514,8 +434,6 @@ class TwistedEdwardCurve(Curve):
             x = q-x
 
         assert (x*x)%q == xx
-
-
         # over F(q):
         #     a.xx +yy = 1+d.xx.yy
         # <=> xx(a-d.yy) = 1-yy
@@ -529,41 +447,8 @@ class TwistedEdwardCurve(Curve):
         # x = self._sqrt(xx,q,sign) # Inherited generic Tonelli–Shanks from Curve 
         return x
 
-    def encode_point(self, P):
-        """ Encodes a point P according to *draft_irtf-cfrg-eddsa-04*.
-        
-        Args:
-            P: point to encode
-
-        Returns
-           bytes : encoded point
-        """
-        size = self._coord_size()
-
-        y = bytearray(P.y.to_bytes(size,'little'))
-        if P.x&1:
-            y[len(y)-1] |= 0x80
-        return bytes(y)
-
-    def decode_point(self, eP):
-        """ Decodes a point P according to *draft_irtf-cfrg-eddsa-04*.
-        
-        Args:
-            eP (bytes)    : encoded point
-            curve (Curve) : curve on witch point is
-        Returns
-           Point : decoded point
-        """
-        y    =  bytearray(eP)
-        sign = y[len(y)-1] & 0x80
-        y[len(y)-1] &= ~0x80
-        y = int.from_bytes(y,'little')    
-        x = self.x_recover(y,sign)
-        return Point(x,y,self,True)
-
-    
-    def add_point(self,P,Q):
-        """ See :func:`Curve.add_point` """
+    def add_point(self, P, Q):
+        """See :func:`Curve.add_point`"""
         q = self.field
         a = self.a
         if (P == Q):
@@ -577,7 +462,7 @@ class TwistedEdwardCurve(Curve):
         return Point(x,y, self)
 
     def mul_point(self, k, P):
-        """ See :func:`Curve.add_point` """
+        """See :func:`Curve.add_point`"""
         q = self.field
         a = self.a
         x1,y1,z1,t1 = self._aff2ext(P.x,P.y, q)
@@ -595,9 +480,8 @@ class TwistedEdwardCurve(Curve):
         x,y = self._ext2aff(x1,y1,z1,t1, q)
         return Point(x,y,self)
 
-    
     @staticmethod
-    def _aff2ext(x,y, q):
+    def _aff2ext(x, y, q):
         z = 1
         t = (x*y*z) % q
         x = (x*z) % q
@@ -605,14 +489,14 @@ class TwistedEdwardCurve(Curve):
         return (x,y,z,t)
     
     @staticmethod
-    def _ext2aff(x,y,z,xy, q):
+    def _ext2aff(x, y, z, xy, q):
         invz = pow(z,q-2,q)
         x = (x*invz)%q
         y = (y*invz)%q
         return (x,y)
     
     @staticmethod
-    def _dbl_ext(X1,Y1,Z1,XY1, q,a):
+    def _dbl_ext(X1, Y1, Z1, XY1, q, a):
         A  = (X1*X1)%q
         B  = (Y1*Y1)%q
         C  = (2*Z1*Z1)%q
@@ -628,7 +512,7 @@ class TwistedEdwardCurve(Curve):
         return (X3,Y3,Z3,XY3)
 
     @staticmethod
-    def _add_ext(X1,Y1,Z1,XY1,  X2,Y2,Z2,XY2, q,a):
+    def _add_ext(X1, Y1, Z1, XY1, X2, Y2, Z2, XY2, q, a):
         A = (X1*X2)%q
         B = (Y1*Y2)%q
         C = (Z1*XY2)%q
@@ -650,35 +534,31 @@ class TwistedEdwardCurve(Curve):
         
       
 class MontgomeryCurve(Curve):
-    """An elliptic curve defined by the equation: b.y²=x³+a*x²+x.  
+    """
+    An elliptic curve defined by the equation: b.y²=x³+a*x²+x.  
     
-        The given domain must be a dictionary providing the following keys/values:
-              - name (str)         : curve unique name
-              - size (int)         : bit size
-              - a    (int)         : `a` equation coefficient
-              - b    (int)         : `b` equation coefficient
-              - field (inf)        : field value 
-              - generator (int[2]) : x,y coordinate of generator
-              - order (int)        : order of generator
+    The given domain must be a dictionary providing the following keys/values:
+        - name (str)         : curve unique name
+        - size (int)         : bit size
+        - a    (int)         : `a` equation coefficient
+        - b    (int)         : `b` equation coefficient
+        - field (inf)        : field value 
+        - generator (int[2]) : x,y coordinate of generator
+        - order (int)        : order of generator
 
-        *Note*: you should not use the constructor and only use :func:`Curve.get_curve`
-        builder to ensure using supported curve.
+    *Note*: you should not use the constructor and only use :func:`Curve.get_curve`
+    builder to ensure using supported curve.
 
-        Args:
-           domain (dict): a dictionary providing curve domain parameters
+    Args:
+        domain (dict) a dictionary providing curve domain parameters
     """
 
-    def __init__(self,domain):
-        """ Built an new short twisted Edward curve with the provided parameters.  """
-        self._domain = {}
-        self._set(domain, ('name','type','size',
-                           'a','b','field','generator','order'))
-        #inv4 = pow(4,p-2,p)
-        #self.a24  = ((self.a+2)*inv4)%p
+    def __init__(self, domain, point_encoder=encoders.Rfc87748):
+        Curve.__init__(self, domain, point_encoder)
         self.a24  = (self.a+2)//4
 
     def is_on_curve(self, P):
-        """ See :func:`Curve.is_on_curve` """
+        """See :func:`Curve.is_on_curve`"""
         p = self.field
         x = P.x
         right = (x*x*x + self.a*x*x + x)%p
@@ -690,49 +570,34 @@ class MontgomeryCurve(Curve):
             #check equation has a solution according to Euler criterion
             return pow(right,(p-1)//2, p) == 1
 
-    def y_recover(self,x,sign=0):
-        """ """
+    def y_recover(self, x, sign=0):
+        """
+        Retrieves the y coordinate according to the y one,
+        such that point (x,y) is on curve.
+        
+        Args:
+            x (int)    x coordinate
+            sign (int) sign of y
+
+        Returns:
+           int
+        """
         p  = self.field
         y2 = (x*x*x + self.a*x*x + x)%p
         y  = self._sqrt(y2,p,sign)
         return y
-     
-    def encode_point(self, P):
-        """ Encodes a point P according to *RFC7748*.
-        
-        Args:
-            P: point to encode
 
-        Returns
-           bytes : encoded point
-        """
-        size = self.size>>3
-        x = bytearray(P.x.to_bytes(size,'little'))
-        return bytes(x)
-
-    def decode_point(self, eP):
-        """ Decodes a point P according to *RFC7748*.
-        
-        Args:
-            eP (bytes)    : encoded point
-            curve (Curve) : curve on witch point is
-        Returns
-           Point : decoded point
-        """
-        x    =  bytearray(eP)
-        x[len(x)-1] &= ~0x80
-        x = int.from_bytes(x,'little')    
-        return Point(x,None,self)
+    def encode_point(self, P, compressed=False):
+        """Encode/compress a point according to its curve"""
+        self.point_encoder.compressed = compressed
+        return self.point_encoder.encode(P.x, None)
 
     def mul_point(self,k,P):
-        """ See :func:`Curve.add_point` """
+        """See :func:`Curve.add_point`"""
         x = self._mul_point_x(k,P.x)
         return Point(x,None, P.curve)
     
     def _mul_point_x(self, k, u):
-        """  """        
-
-
         k = bin(k)
         k = k[2:]
         sz = len(k)
@@ -752,7 +617,7 @@ class MontgomeryCurve(Curve):
         ku = (x2*zinv)%p
         return ku
 
-    def _ladder_step(self, x_qp, x_p,z_p, x_q,z_q):
+    def _ladder_step(self, x_qp, x_p,z_p, x_q, z_q):
         p    = self.field
 
         t1   = (x_p + z_p)              %p
@@ -781,12 +646,6 @@ class Point:
         - `+` : Point Addition, with automatic doubling support.
         - `*` : Scalar multiplication, can write as k*P or P*k, with P :class:Point and  k :class:int
         - `==`: Point comparison
-    
-    Attributes:
-        x (int)       : Affine x coordinate 
-        y (int)       : Affine y coordinate 
-        curve (Curve) : Curve on which the point is define
-
 
     Args:
         x (int) :     x coordinate
@@ -794,13 +653,14 @@ class Point:
         check (bool): if True enforce x,y is on curve
 
     Raises:
-        ECPyException : if check=True and x,y is not on curve 
+        ECPyException
     """
 
-    __slots__ = '_x','_y','_curve'
+    __slots__ = '_x','_y','_curve', '_enc'
     
-    def __init__(self, x,y, curve, check=True):  
-        self._curve = curve 
+    def __init__(self, x, y, curve, check=True):  
+        self._curve = curve
+        self._enc = encoders.Secp256k1(self._curve)
         if x:
             self._x = int(x)
         if y :
@@ -824,28 +684,28 @@ class Point:
     
     def __neg__(self):
         curve = self.curve
-        return Point(self.x,curve.field-self.y,curve)
+        return Point(self.x,curve.field-self.y, curve)
     
     def __add__(self, Q):
-        if isinstance(Q,Point) :
-            return self.curve.add_point(self,Q)
+        if isinstance(Q,  Point) :
+            return self.curve.add_point(self, Q)
         raise NotImplementedError('__add__: type not supported: %s'%type(Q))
 
     def __sub__(self, Q):
-        if isinstance(Q,Point) :
-            return self.curve.sub_point(self,Q)
+        if isinstance(Q, Point) :
+            return self.curve.sub_point(self, Q)
         raise NotImplementedError('__sub__: type not supported: %s'%type(Q))
 
     def __mul__(self, scal):
         if isinstance(scal, (int, long)):
-            return self.curve.mul_point(scal,self)
+            return self.curve.mul_point(scal, self)
         raise NotImplementedError('__mul__: type not supported: %s'%type(scal))
 
-    def __rmul__(self,scal) :
+    def __rmul__(self, scal) :
         return self.__mul__(scal)
     
-    def __eq__(self,Q):
-        if isinstance(Q,Point) :
+    def __eq__(self, Q):
+        if isinstance(Q, Point) :
             return ((self._curve.name == Q._curve.name or
                      self._curve.name == None or
                      Q._curve.name    == None ) and
@@ -868,51 +728,22 @@ class Point:
     def mul(self, k):
         return self.__mul__(k)
     
-    def eq(self,Q):
+    def eq(self, Q):
         return self.__eq__(Q)
 
-    def to_bytes(self, compressed=True):
-        """ Point serialisation.
-        Serialization is the standard one:
-        
-        - O2 x    for even x in compressed form
-        - 03 x    for odd x in compressed form
-        - 04 x y  for uncompressed form
-        """
-        if compressed:
-            b = self.x.to_bytes(self.curve.size>>3,'big')
-            if self.y & 1:
-                b = b"\x03"+b
-            else:
-                b = b"\x02"+b
-        else:
-            b = b"\x04"+self.x.to_bytes(32,'big')+self.y.to_bytes(32,'big')
-        return b
+    def encode(self, compressed=True):
+        self._enc.compressed = compressed
+        return self._enc.encode(self.x, self.y)
+    to_bytes = encode
 
     @staticmethod
-    def from_bytes(data, curve):
-        """ Decodes a point P according to *P1363-2000*.
-        
-        Args:
-            eP (bytes)    : encoded point
-            curve (Curve) : curve on witch point is
-        Returns
-           Point : decoded point
-        """
-        size = curve.size>>3
-        xy   = bytearray(data)
-        if xy[0] in [2, 3]:
-            x = xy[1:1+size]
-            x = int.from_bytes(x, 'big')
-            y = curve.y_recover(x, 0 if xy[0] == 2 else 1)  
-        elif xy[0] == 4:
-            x = xy[1:1+size]
-            x = int.from_bytes(x,'big')    
-            y = xy[1+size:1+size+size]
-            y = int.from_bytes(y,'big')    
-        else:
-            raise ECPyException("Invalid encoded point")
-        return Point(x,y,curve,False)
+    def decode(data, curve):
+        return Point(
+            *encoders.Secp256k1(curve).decode(data, curve),
+            curve=curve,
+            check=True
+        )
+    from_bytes = decode
 
 
 class ECPyException(Exception):
@@ -923,8 +754,6 @@ class ECPyException(Exception):
         return rept(self.value)
 
 
-
-    
 WEIERSTRASS   = "weierstrass"
 TWISTEDEDWARD = "twistededward"
 MONTGOMERY     = "montgomery"
@@ -1447,7 +1276,7 @@ if __name__ == "__main__":
                          1]
 
         P = cv.encode_point(W2)
-        assert(P == W2_enc)
+        assert(bytearray(P) == bytearray(W2_enc))
         P = cv.decode_point(P)
         assert(P == W2)
         
@@ -1518,7 +1347,7 @@ if __name__ == "__main__":
 
         #0x449a44ba44226a50185afcc10a4c1462dd5e46824b15163b9d7c52f06be346a0
         k = binascii.unhexlify("a546e36bf0527c9d3b16154b82465edd62144c0ac1fc5a18506a2244ba449ac4")
-        k = decode_scalar_25519(k)
+        k = encoders.decode_scalar_25519(k)
         assert(k == 31029842492115040904895560451863089656472772604678260265531221036453811406496)
         
         eP =  binascii.unhexlify("e6db6867583030db3594c1a424b15f7c726624ec26b3353b10a903a6d0ab1c4c")
@@ -1536,7 +1365,7 @@ if __name__ == "__main__":
 
         #0x4dba18799e16a42cd401eae021641bc1f56a7d959126d25a3c67b4d1d4e96648
         k = binascii.unhexlify("4b66e9d4d1b4673c5ad22691957d6af5c11b6421e0ea01d42ca4169e7918ba0d")
-        k = decode_scalar_25519(k)
+        k = encoders.decode_scalar_25519(k)
         assert(k == 35156891815674817266734212754503633747128614016119564763269015315466259359304)
         
         eP =  binascii.unhexlify("e5210f12786811d3f4b7959d0538ae2c31dbe7106fc03c3efc4cd549c715a493")

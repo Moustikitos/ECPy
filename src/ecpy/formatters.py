@@ -13,109 +13,107 @@
 # limitations under the License.
 
 #python 2 compatibility
-import sys
-from builtins import int,pow
+from builtins import int, pow
 
-def list_formats():
-    return ("DER","BTUPLE","ITUPLE","RAW","EDDSA")
 
-def encode_sig(r,s,fmt="DER",size=0) :
-    """ encore signature according format
+FORMATS = ("DER", "BTUPLE", "ITUPLE", "RAW", "EDDSA")
 
-    Args:
-        r (int):   r value
-        s (int):   s value
-        fmt (str): 'DER'|'BTUPLE'|'ITUPLE'|'RAW'|'EDDSA'
-
-    Returns:
-         bytes:  TLV   for DER encoding
-    Returns:
-         bytes:  (r,s) for BTUPLE encoding
-    Returns:
-         ints:   (r,s) for ITUPLE encoding
-    Returns:
-         bytes:  r|s   for RAW encoding
+def encode_sig(r, s, fmt="DER", size=0):
     """
-    
-    if fmt=="DER":        
-        r = r.to_bytes((r.bit_length()+7)//8, 'big')
-        s = s.to_bytes((s.bit_length()+7)//8, 'big')
-        if (r[0] & 0x80) == 0x80 :
-            r = b'\0'+r
-        if (s[0] & 0x80) == 0x80 :
-            s = b'\0'+s
-        sig = (b'\x30'+int((len(r)+len(s)+4)).to_bytes(1,'big') +
-               b'\x02'+int(len(r)).to_bytes(1,'big') + r        +
-               b'\x02'+int(len(s)).to_bytes(1,'big') + s      )
-        return sig
-
-    if fmt=="BTUPLE":
-        r = r.to_bytes((r.bit_length()+7)//8, 'big')
-        s = s.to_bytes((s.bit_length()+7)//8, 'big')
-        return (r,s)
-
-    if fmt=="ITUPLE":
-        return (r,s)
-    
-    if fmt=="RAW":
-        if size == 0:
-            size = (max(r.bit_length(), s.bit_length())+7) // 8
-        r = r.to_bytes(size, 'big')
-        s = s.to_bytes(size, 'big')
-        return r+s
-
-    if fmt=="EDDSA":
-        if size == 0:
-            size = (max(r.bit_length(), s.bit_length())+7) // 8
-        r = r.to_bytes(size, 'little')
-        s = s.to_bytes(size, 'little')
-        return r+s
-
-    
-def decode_sig(sig,fmt="DER") :
-    """ encore signature according format
+    Encore signature according to format
 
     Args:
-        rs (bytes,ints,tuple) : r,s value       
+        r (int)   r value
+        s (int)   s value
+        fmt (str) 'DER'|'BTUPLE'|'ITUPLE'|'RAW'|'EDDSA'
+
+    Returns:
+        bytes          for DER, RAW and EDDSA encoding
+    Returns:
+        (bytes, bytes) for BTUPLE encoding
+    Returns:
+        (int, int):    for ITUPLE encoding
+    """
+
+    if fmt == "DER":
+        r = r.to_bytes((r.bit_length()+7)//8, 'big')
+        s = s.to_bytes((s.bit_length()+7)//8, 'big')
+        if (r[0] & 0x80) == 0x80:
+            r = b'\0' + r
+        if (s[0] & 0x80) == 0x80:
+            s = b'\0' + s
+        return b'\x30' + int((len(r)+len(s)+4)).to_bytes(1, 'big') + \
+               b'\x02' + int(len(r)).to_bytes(1, 'big') + r        + \
+               b'\x02' + int(len(s)).to_bytes(1, 'big') + s 
+
+    if fmt == "BTUPLE":
+        return (
+            r.to_bytes((r.bit_length()+7)//8, 'big'),
+            s.to_bytes((s.bit_length()+7)//8, 'big')
+        )
+
+    if fmt == "ITUPLE":
+        return (r, s)
+    
+    if fmt == "RAW":
+        if size == 0:
+            size = (max(r.bit_length(), s.bit_length())+7) // 8
+        return r.to_bytes(size, 'big') + s.to_bytes(size, 'big')
+
+    if fmt == "EDDSA":
+        if size == 0:
+            size = (max(r.bit_length(), s.bit_length())+7) // 8
+        return r.to_bytes(size, 'little') + s.to_bytes(size, 'little')
+
+    
+def decode_sig(sig, fmt="DER") :
+    """
+    Decode signature according to format
+
+    Args:
+        sig     
         fmt (str): 'DER'|'BTUPLE'|'ITUPLES'|'RAW'|'EDDSA'
 
-    Returns:       
-       ints:   (r,s) 
+    Returns:
+       (int, int)
     """
 
-    if fmt=="DER":
-        if sys.version_info[0] <= 2:
-            sig = bytearray(sig)
-        sig_len  = sig[1] + 2
-        r_offset = 4
-        r_len    = sig[3]
-        s_offset = 4+r_len+2
-        s_len    = sig[4+r_len+1]
-        if ( sig[0]  != 0x30          or
-             sig_len != r_len+s_len+6 or
-             sig[r_offset-2] != 0x02  or 
-             sig[s_offset-2] != 0x02  ):
-            return None,None
-        r = int.from_bytes(sig[r_offset:r_offset+r_len], 'big')
-        s = int.from_bytes(sig[s_offset:s_offset+s_len], 'big')                
-        return r,s
+    if fmt == "DER":
+        sig = bytearray(sig)
+        sig_len = sig[1] + 2
+        r_offset, r_len = 4, sig[3]
+        s_offset, s_len = 4+r_len+2, sig[4+r_len+1]
+        if (
+            sig[0]  != 0x30          or
+            sig_len != r_len+s_len+6 or
+            sig[r_offset-2] != 0x02  or
+            sig[s_offset-2] != 0x02):
+            return None, None
+        return (
+            int.from_bytes(sig[r_offset:r_offset+r_len], 'big'),
+            int.from_bytes(sig[s_offset:s_offset+s_len], 'big')
+        )
     
-    if fmt=="ITUPLE":
-        return (sig[0],sig[1])
+    if fmt == "ITUPLE":
+        return sig
 
-    if fmt=="BTUPLE":        
-        r = int.from_bytes(sig[0], 'big')
-        s = int.from_bytes(sig[1], 'big')                
-        return r,s
+    if fmt == "BTUPLE":        
+        return (
+            int.from_bytes(sig[0], 'big'),
+            int.from_bytes(sig[1], 'big')                
+        )
 
-    if fmt=="RAW":
+    if fmt == "RAW":
         l = len(sig)>>1
-        r = int.from_bytes(sig[0:l], 'big')
-        s = int.from_bytes(sig[l:],  'big')
-        return r,s
+        return (
+            int.from_bytes(sig[0:l], 'big'),
+            int.from_bytes(sig[l:],  'big')
+        )
 
-    if fmt=="EDDSA":
+    if fmt == "EDDSA":
         l = len(sig)>>1
-        r = int.from_bytes(sig[0:l], 'little')
-        s = int.from_bytes(sig[l:],  'little')
-        return r,s
+        return (
+            int.from_bytes(sig[0:l], 'little'),
+            int.from_bytes(sig[l:],  'little')
+        )
+

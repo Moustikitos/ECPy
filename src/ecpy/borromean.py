@@ -21,32 +21,10 @@ import binascii
 
 from ecpy.curves     import Curve,Point
 from ecpy.keys       import ECPublicKey, ECPrivateKey
-from ecpy.formatters import decode_sig, encode_sig, list_formats
+from ecpy.formatters import decode_sig, encode_sig
+from ecpy.encoders   import Secp256k1
 from ecpy            import ecrand
 from ecpy.curves     import ECPyException
-
-
-# def _h(b):
-#     return binascii.hexlify(b)
-
-
-def _point_to_bytes(point, compressed=True):
-    """
-    Standart point serialisation
-     - O2 x    for even x in compressed form
-     - 03 x    for odd x in compressed form
-     - 04 x y  for uncompressed form
-
-    Args:
-        point (ecpy.keys.ECPublicKey) curve point to convert
-
-    Returns
-        bytes
-    """
-    if compressed:
-        return (b"\x03" if point.y & 1 else b"\x02") + point.x.to_bytes(32,'big')
-    else:
-        return b"\x04" + point.x.to_bytes(32,'big') + point.y.to_bytes(32,'big')
 
 
 def _borromean_hash(m, e, i, j, hasher):
@@ -84,6 +62,7 @@ class Borromean:
         self.fmt = fmt
         self._curve = Curve.get_curve('secp256k1')
         self._hash = hashlib.sha256
+        self._enc = Secp256k1(self._curve, compressed=True)
     
     def sign(self, msg, rings, pv_keys, pv_keys_index):
         """
@@ -122,7 +101,8 @@ class Borromean:
             (e0, [s0,s1....]) : signature
         """
         # shorcuts
-        G     = self._curve.generator
+        _point_to_bytes = lambda P: self._enc.encode(P.x, P.y)
+        G = self._curve.generator
         order = self._curve.order
         # set up locals
         ring_count = len(rings)
@@ -182,7 +162,8 @@ class Borromean:
             boolean : True if signature is verified, False else
         """
         # shortcuts
-        G     = self._curve.generator
+        _point_to_bytes = lambda P: self._enc.encode(P.x, P.y)
+        G = self._curve.generator
         # set up locals
         ring_count = len(rings)
         pubkeys = []
