@@ -16,6 +16,10 @@
 import future
 import hashlib
 from builtins import int, pow
+try:
+    from builtins import long
+except ImportError:
+    long = int
 
 
 class ECPublicKey:
@@ -43,7 +47,7 @@ class ECPublicKey:
         return ECPublicKey(curve.decode_point(data))
 
     def __str__(self):
-        return "ECPublicKey:\n  x: %x\n  y: %x" % (self.W.x,self.W.y)
+        return "ECPublicKey:\n  x: %x\n  y: %x" % (self.W.x, self.W.y)
         
     def encode_point(self, compressed=True):
         return self.curve.encode_point(self.W, compressed)
@@ -82,7 +86,7 @@ class ECPrivateKey:
         Returns:
            ECPublicKey : public key
         """
-        W = self.d*self.curve.generator
+        W = self.d * self.curve.generator
         return ECPublicKey(W)
 
     def __str__(self):

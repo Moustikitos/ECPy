@@ -12,8 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#python 2 compatibility
+# python 2 compatibility
+import future
 from builtins import int, pow
+try:
+    from builtins import long
+    long = int
+except ImportError:
+    long = int
 
 
 FORMATS = ("DER", "BTUPLE", "ITUPLE", "RAW", "EDDSA")
@@ -34,6 +40,7 @@ def encode_sig(r, s, fmt="DER", size=0):
     Returns:
         (int, int):    for ITUPLE encoding
     """
+    r, s = int(r), int(s)
 
     if fmt == "DER":
         r = r.to_bytes((r.bit_length()+7)//8, 'big')
@@ -65,7 +72,7 @@ def encode_sig(r, s, fmt="DER", size=0):
             size = (max(r.bit_length(), s.bit_length())+7) // 8
         return r.to_bytes(size, 'little') + s.to_bytes(size, 'little')
 
-    
+
 def decode_sig(sig, fmt="DER") :
     """
     Decode signature according to format

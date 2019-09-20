@@ -13,9 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# python 2 compatibility
 import future
-#python 2 compatibility
 from builtins import int
+try:
+    from builtins import long
+except ImportError:
+    long = int
 
 
 class Encoder:
@@ -38,6 +42,11 @@ class Encoder:
         Returns
             bytes
         """
+        if x and isinstance(x, long): x = int(x)
+        if y and isinstance(y, long): y = int(y)
+        return self._encode(x, y)
+
+    def _encode(self, x, y):
         raise NotImplementedError()
 
     def decode(self, data, curve):
@@ -65,7 +74,7 @@ class Secp256k1(Encoder):
         else:
             return curve.size >> 3
 
-    def encode(self, x, y):
+    def _encode(self, x, y):
         length = self.length
         if self.compressed:
             return (b"\x03" if y & 1 else b"\x02") + x.to_bytes(length, "big")
@@ -93,7 +102,7 @@ class Rfc87748(Encoder):
         else:
             raise Exception("only available within MONTGOMERY curve")
 
-    def encode(self, x, y):
+    def _encode(self, x, y):
         return x.to_bytes(self.length, "little")
 
     def decode(self, data, curve=None):
@@ -113,7 +122,7 @@ class Eddsa04(Encoder):
         else:
             raise Exception("invalid curve name '%s' (should be 'Ed25519' or 'Ed448')" % curve.name)
 
-    def encode(self, x, y):
+    def _encode(self, x, y):
         length = self.length
         y = bytearray(y.to_bytes(length, "little"))
         if x & 1:
@@ -135,7 +144,7 @@ class P1363_2000(Encoder):
     - 04 | x | y for uncompressed form
     """
 
-    def encode(self, x, y):
+    def _encode(self, x, y):
         length = self.length
         if self.compressed:
             return b"\x02" + x.to_bytes(length, "big") + (b"\x01" if y&1 else b"\x00")

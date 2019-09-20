@@ -19,9 +19,9 @@
 .. moduleauthor:: Cédric Mesnil <cedric.mesnil@ubinity.com>
 
 """
-import future
 
-#python 2 compatibility
+# python 2 compatibility
+import future
 from builtins import int, pow
 try:
     from builtins import long
@@ -702,8 +702,10 @@ class Point:
         raise NotImplementedError('__sub__: type not supported: %s'%type(Q))
 
     def __mul__(self, scal):
-        if isinstance(scal, (int, long)):
-            return self.curve.mul_point(scal, self)
+        if isinstance(scal, long):
+            scal = int(scal)
+        if isinstance(scal, int):
+            return self.curve.mul_point(int(scal), self)
         raise NotImplementedError('__mul__: type not supported: %s'%type(scal))
 
     def __rmul__(self, scal) :
