@@ -14,7 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 """ Elliptic Curve and Point manipulation
 
 .. moduleauthor:: Cédric Mesnil <cedric.mesnil@ubinity.com>
@@ -30,12 +29,17 @@ except ImportError:
     long = int
 
 import binascii
+import hashlib
 import random
+import re
 
 from ecpy import encoders
 
+HEX = re.compile("^[0-9a-fA-F]$")
+BHEX = re.compile(b"^[0-9a-fA-F]$")
 
-class Curve:
+
+class Curve(object):
     """
     Elliptic Curve abstraction
 
@@ -71,11 +75,11 @@ class Curve:
         if len(l) == 0:
             return None
         cp = l[0]
-        if cp['type'] == WEIERSTRASS:
+        if cp['type'] == "weierstrass":
             return WeierstrassCurve(cp)
-        if cp['type'] == TWISTEDEDWARD:
+        if cp['type'] == "twistededward":
             return TwistedEdwardCurve(cp)
-        if cp['type'] == MONTGOMERY:
+        if cp['type'] == "montgomery":
             return MontgomeryCurve(cp)
         return None
 
@@ -89,28 +93,29 @@ class Curve:
         """
         return [c['name'] for c in curves]
     
-    def __init__(self, domain, point_encoder=encoders.Secp256k1):
-        self._domain = {}
-        self._set(domain, domain.keys())
-        self.point_encoder = point_encoder(self, compressed=False)
+    def __init__(self, cnf={}, **kw):
+        parameters = dict(cnf, **kw)
+        encoder = parameters.pop("point_encoder", encoders.Secp256k1)
+        generator = parameters.pop("generator", (0, 0))
+        for attr, value in parameters.items():
+            setattr(self, attr, value)
+        object.__setattr__(self, "point_encoder", encoder(self, compressed=False))
+        object.__setattr__(self, "generator", Point(*generator, curve=self))
 
-    def _set(self, params, keys):
-        for k in keys :
-            self._domain[k] = params[k]
-        self._domain['name'] = str(self._domain['name'])
-        self._domain['generator'] = Point(
-            self._domain['generator'][0],
-            self._domain['generator'][1],
-            self
-        )
+    def __setattr__(self, attr, value):
+        if attr in ['size', 'field', 'order', 'cofactor', 'a', 'b', 'd']:
+            if isinstance(value, str) and HEX.match(value):
+                value = int(value, 16)
+            else:
+                value = int(value)
+        elif attr in ['name', 'type']:
+            value = str(value)
+        else:
+            raise AttributeError("read only attributes '%s'" % attr)
+        object.__setattr__(self, attr, value)
 
-    def __getattr__(self, name):
-        if name in self._domain:
-            return self._domain[name]
-        raise AttributeError(name)
-
-    def __str__(self):
-        return str(self._domain).replace(',','\n')
+    # def __str__(self):
+    #     return str(self._domain).replace(',','\n')
 
     def is_on_curve(self, P):
         """
@@ -256,7 +261,7 @@ class WeierstrassCurve(Curve):
     """
 
     def __init__(self, domain, point_encoder=encoders.P1363_2000):
-        Curve.__init__(self, domain, point_encoder)
+        Curve.__init__(self, domain, point_encoder=point_encoder)
 
     def is_on_curve(self, P):
         """See :func:`Curve.is_on_curve`"""
@@ -384,7 +389,7 @@ class TwistedEdwardCurve(Curve):
     """
 
     def __init__(self, domain, point_encoder=encoders.Eddsa04):
-        Curve.__init__(self, domain, point_encoder)
+        Curve.__init__(self, domain, point_encoder=point_encoder)
 
     def is_on_curve(self, P):
         """See :func:`Curve.is_on_curve`"""
@@ -554,8 +559,8 @@ class MontgomeryCurve(Curve):
     """
 
     def __init__(self, domain, point_encoder=encoders.Rfc87748):
-        Curve.__init__(self, domain, point_encoder)
-        self.a24  = (self.a+2)//4
+        Curve.__init__(self, domain, point_encoder=point_encoder)
+        object.__setattr__(self, "a24", (self.a+2)//4)
 
     def is_on_curve(self, P):
         """See :func:`Curve.is_on_curve`"""
@@ -738,8 +743,9 @@ class Point:
 
     @staticmethod
     def decode(data, curve):
+        _enc = (encoders.Secp256k1 if hasattr(curve, "y_recover") else encoders.Eddsa04)
         return Point(
-            *encoders.Secp256k1(curve).decode(data, curve),
+            *_enc.decode(data, curve),
             curve=curve,
             check=True
         )

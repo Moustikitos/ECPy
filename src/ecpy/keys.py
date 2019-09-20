@@ -14,12 +14,13 @@
 
 #python 2 compatibility
 import future
+import hashlib
 from builtins import int, pow
-import ecpy.curves
 
 
 class ECPublicKey:
-    """ Public EC key.
+    """
+    Elliptic curve private key.
     
     Can be used for both ECDSA and EDDSA signature
 
@@ -27,7 +28,7 @@ class ECPublicKey:
         W (Point): public key point
 
     Args:
-       W (Point): public key value
+        W (Point): public key value
     """
     
     def __init__(self, W):
@@ -49,7 +50,7 @@ class ECPublicKey:
     
 
 class ECPrivateKey:
-    """ Public EC key.
+    """Elliptic curve private key.
     
     Can be used for both ECDSA and EDDSA signature
 
@@ -58,16 +59,20 @@ class ECPrivateKey:
         curve (Curve) : curve
 
     Args:
-       d (int):        private key value
-       curve (Curve) : curve
+        d (int):        private key value
+        curve (Curve) : curve
     """
-    
+    @staticmethod
+    def from_secret(secret, curve, hasher=hashlib.sha256):
+        return ECPrivateKey(int.from_bytes(hasher(secret).digest(), "big"), curve)
+
     def __init__(self, d, curve):
         self.d = int(d)
         self.curve = curve
-    
+
     def get_public_key(self):
-        """ Returns the public key corresponding to this private key 
+        """
+        Returns the public key corresponding to this private key 
         
         This method considers the private key the generator multiplier and
         return pv*Generator in all cases.

@@ -189,7 +189,7 @@ class ECSchnorr:
             msg (bytes)                    : the message hash to sign
             pv_key (ecpy.keys.ECPrivateKey): key to use for signing
         """
-        if pv_key.curve.name != 'secp256k1':
+        if pv_key.curve.name != 'secp256k1' or self.option != "SECP256K1":
             raise ECPyException("specific 'secp256k1' curve signature")
 
         size = pv_key.curve.size >> 3
@@ -277,7 +277,7 @@ class ECSchnorr:
         
         return encode_sig(r, s, self.fmt, 0 if self.fmt not in ["RAW", "EDDSA"] else size)
             
-    def verify(self,msg,sig,pu_key):
+    def verify(self, msg, sig, pu_key):
         """ Verifies a message signature.                
 
         Args:
