@@ -26,7 +26,7 @@ setup(
     version          = '0.10.0',
     description      = 'Pure Pyhton Elliptic Curve Library',
     long_description = long_description,
-	long_description_content_type = "text/markdown",
+    long_description_content_type = "text/markdown",
     keywords         = 'ecdsa eddsa ed25519 ed448 schnorr elliptic curve',
     author           = 'Cedric Mesnil',
     author_email     = 'cslashm@gmail.com',
