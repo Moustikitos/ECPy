@@ -35,9 +35,7 @@ setup(
     provides         = ['ecpy'],
     packages         = ['ecpy'],
     package_dir      = {'ecpy': 'src/ecpy'},
-    extra_requires   = {
-        ':python_version<="3.0"': ['future']
-    },
+    install_requires = ["future"] if sys.version_info[0] < 3 else [],
     classifiers      = [
         'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
