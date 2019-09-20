@@ -234,7 +234,7 @@ class Curve(object):
                     m = i
         if sign:
             sign = 1
-        if r &1 != sign:
+        if r&1 != sign:
             r = p-r
         return r
 
@@ -439,17 +439,6 @@ class TwistedEdwardCurve(Curve):
             x = q-x
 
         assert (x*x)%q == xx
-        # over F(q):
-        #     a.xx +yy = 1+d.xx.yy
-        # <=> xx(a-d.yy) = 1-yy
-        # <=> xx = (1-yy)/(a-d.yy)
-        # <=> x = +- sqrt((1-yy)/(a-d.yy))
-        # yy   = (y*y)%q
-        # u    = (1-yy)%q
-        # v    = (a - d*yy)%q
-        # v_1 = pow(v, q-2,q)
-        # xx = (v_1*u)%q
-        # x = self._sqrt(xx,q,sign) # Inherited generic Tonelli–Shanks from Curve 
         return x
 
     def add_point(self, P, Q):
@@ -589,7 +578,7 @@ class MontgomeryCurve(Curve):
         """
         p  = self.field
         y2 = (x*x*x + self.a*x*x + x)%p
-        y  = self._sqrt(y2,p,sign)
+        y  = self._sqrt(y2, p, sign)
         return y
 
     def encode_point(self, P, compressed=False):
@@ -668,10 +657,19 @@ class Point:
         self._enc = (encoders.Secp256k1 if hasattr(self._curve, "y_recover") else encoders.Eddsa04)(self._curve)
         if x:
             self._x = int(x)
-        if y :
+        if y:
             self._y = int(y)
+
+        if x and not y and hasattr(curve, "y_recover"):
+            self._y = curve.y_recover(x, sign=True)
+            check = False
+        elif y and not x and hasattr(curve, "x_recover"):
+            self._x = curve.x_recover(y, sign=True)
+            check = False
+
         if not x or not y:
             check = False
+
         if check and not curve.is_on_curve(self):
             raise ECPyException("Point not on curve")
         
@@ -745,12 +743,9 @@ class Point:
 
     @staticmethod
     def decode(data, curve):
-        _enc = (encoders.Secp256k1 if hasattr(curve, "y_recover") else encoders.Eddsa04)
-        return Point(
-            *_enc.decode(data, curve),
-            curve=curve,
-            check=True
-        )
+        _enc = (encoders.Secp256k1 if hasattr(curve, "y_recover") else encoders.Eddsa04)(curve)
+        x, y = _enc.decode(data, curve)
+        return Point(x, y, curve, check=True)
     from_bytes = decode
 
 

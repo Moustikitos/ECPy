@@ -98,18 +98,7 @@ class ECDSA:
         if canonical and (s > (n//2)):
             s = n-s
         
-        sig = encode_sig(r,s,self.fmt)
-        
-        # r = r.to_bytes((r.bit_length()+7)//8, 'big')
-        # s = s.to_bytes((s.bit_length()+7)//8, 'big')
-        # if (r[0] & 0x80) == 0x80 :
-        #     r = b'\0'+r
-        # if (s[0] & 0x80) == 0x80 :
-        #     s = b'\0'+s
-        # sig = (b'\x30'+int((len(r)+len(s)+4)).to_bytes(1,'big') +
-        #        b'\x02'+int(len(r)).to_bytes(1,'big') + r        +
-        #        b'\x02'+int(len(s)).to_bytes(1,'big') + s      )
-        return sig
+        return encode_sig(r,s,self.fmt)
             
     def verify(self,msg,sig,pu_key):
         """ Verifies a message signature.                

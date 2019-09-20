@@ -66,9 +66,26 @@ class ECPrivateKey:
         d (int):        private key value
         curve (Curve) : curve
     """
+
     @staticmethod
-    def from_secret(secret, curve, hasher=hashlib.sha256):
-        return ECPrivateKey(int.from_bytes(hasher(secret).digest(), "big"), curve)
+    def from_secret(secret, curve, hasher=None, encoding="utf-8"):
+        secret = secret.encode(encoding) if not isinstance(secret, bytes) else \
+                 seccret
+        if not hasher:
+            size = curve.size
+            # {521, !512, !448, !384, !320, !256, !224, !192, !160}
+            h = hashlib.sha512(secret).digest() if size == 512 else \
+                hashlib.sha512(secret).digets()[:448>>3] if size == 448 else \
+                hashlib.sha384(secret).digets() if size == 384 else \
+                hashlib.sha384(secret).digets()[:320>>3] if size == 320 else \
+                hashlib.sha256(secret).digest() if size == 256 else \
+                hashlib.sha224(secret).digest() if size == 224 else \
+                hashlib.sha224(secret).digest()[:192>>3] if size == 192 else \
+                hashlib.sha224(secret).digest()[:160>>3] if size == 160 else \
+                None
+        if not h:
+            raise Exception("can not initialize seed value for curve size %d" % size)
+        return ECPrivateKey(int.from_bytes(h, "big"), curve)
 
     def __init__(self, d, curve):
         self.d = int(d)
