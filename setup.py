@@ -18,32 +18,31 @@ from distutils.core import setup
 if  sys.version_info[0] == 2 and sys.version_info[1] < 7:
     sys.exit("Sorry, Python 2.7 or higher (included 3.x) is only supported ")
 
-reqs = []
-if  sys.version_info[0] == 2:
-    reqs.append('future')
-
-with open('README.rst') as file:
+with open('README.md') as file:
     long_description = file.read()
 
-setup(name='ECPy',
-      version='0.10.0',
-      description='Pure Pyhton Elliptic Curve Library',
-      long_description=long_description,
-      keywords='ecdsa eddsa ed25519 ed448 schnorr ecschnorr elliptic curve',
-      author='Cedric Mesnil',
-      author_email='cslashm@gmail.com',
-      url='https://github.com/cslashm/ECPy',
-      license='Apache License - Version 2.0',
-      provides=['ecpy'],
-      packages=['ecpy'],
-      package_dir={'ecpy': 'src/ecpy'},
-      install_requires=reqs,
-      extra_requires={
-          ':python_version<="2.7"': ['future']
-      },
-      classifiers=['Programming Language :: Python :: 2.7',
-                   'Programming Language :: Python :: 3',
-                   'Development Status :: 4 - Beta',
-                   'License :: OSI Approved :: Apache Software License',
-                   'Topic :: Security :: Cryptography']
-     )
+setup(
+    name             = 'ECPy',
+    version          = '0.10.0',
+    description      = 'Pure Pyhton Elliptic Curve Library',
+    long_description = long_description,
+	long_description_content_type = "text/markdown",
+    keywords         = 'ecdsa eddsa ed25519 ed448 schnorr elliptic curve',
+    author           = 'Cedric Mesnil',
+    author_email     = 'cslashm@gmail.com',
+    url              = 'https://github.com/cslashm/ECPy',
+    license          = 'Apache License - Version 2.0',
+    provides         = ['ecpy'],
+    packages         = ['ecpy'],
+    package_dir      = {'ecpy': 'src/ecpy'},
+    extra_requires   = {
+        ':python_version<="2.7"': ['future']
+    },
+    classifiers      = [
+        'Programming Language :: Python :: 2.7',
+        'Programming Language :: Python :: 3',
+        'Development Status :: 4 - Beta',
+        'License :: OSI Approved :: Apache Software License',
+        'Topic :: Security :: Cryptography'
+    ]
+)

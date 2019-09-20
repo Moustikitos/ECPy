@@ -36,4 +36,6 @@ assert(signer.verify(b'01234567890123456789012345678912', sig, pu_key))
 
 # Quick Install
 
-## From Github
+```bash
+python -m pip install git+https://github.com/Moustikitos/ecpy.git@schnorr-rfc6979
+```
