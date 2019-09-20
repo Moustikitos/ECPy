@@ -36,7 +36,7 @@ setup(
     packages         = ['ecpy'],
     package_dir      = {'ecpy': 'src/ecpy'},
     extra_requires   = {
-        ':python_version<="2.7"': ['future']
+        ':python_version<="3.0"': ['future']
     },
     classifiers      = [
         'Programming Language :: Python :: 2.7',
