@@ -40,8 +40,10 @@ BHEX = re.compile(b"^[0-9a-fA-F]$")
 
 class Curve(object):
     """
-    Elliptic Curve abstract class. You should not directly create such Object.
-    Use :func:`Curve.get_curve` to create a predefined curve.
+    Elliptic Curve abstract class.
+    
+    You should not directly create such Object. Use :func:`Curve.get_curve` to
+    create a predefined curve.
 
     Supported well know elliptic curve are:
         - Short Weierstrass: y²=x³+ax+b
@@ -60,7 +62,7 @@ class Curve(object):
 
     @staticmethod
     def get_curve(name):
-        """Return a Curve object  according to its name
+        """Return a Curve object according to its name
         
         Args:
             name (:class:`str`): curve name to retrieve
@@ -83,7 +85,7 @@ class Curve(object):
     @staticmethod    
     def get_curve_names():
         """
-        Returns all known curve names
+        Returns all known curve names.
 
         Returns: 
             :class:`tuple`: list of available curves
