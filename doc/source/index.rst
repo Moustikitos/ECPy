@@ -14,6 +14,7 @@ Welcome to ECPy's documentation!
    formatters
    keys
    curves
+   ecschnorr
 
 Indices and tables
 ^^^^^^^^^^^^^^^^^^

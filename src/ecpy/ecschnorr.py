@@ -16,11 +16,11 @@
 import future
 from builtins import int, pow
 
-from ecpy.curves     import Curve,Point
-from ecpy.keys       import ECPublicKey, ECPrivateKey
+from ecpy.curves import Curve,Point
+from ecpy.keys import ECPublicKey, ECPrivateKey
 from ecpy.formatters import decode_sig, encode_sig, FORMATS
-from ecpy            import ecrand
-from ecpy.curves     import ECPyException
+from ecpy import ecrand
+from ecpy.curves import ECPyException
 
 import hashlib
 import binascii
@@ -31,82 +31,93 @@ def _jacobi(x, p):
 
 
 class ECSchnorr:
-    """ ECSchnorr signer implementation according to:
+    """
+    ECSchnorr signer implementation according to:
  
-     - `BSI:TR03111 <https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/Publications/TechGuidelines/TR03111/BSI-TR-03111_pdf.html>`_
-     - `ISO/IEC:14888-3 <http://www.iso.org/iso/iso_catalogue/catalogue_ics/catalogue_detail_ics.htm?csnumber=43656>`_
-     - `bitcoin-core:libsecp256k1 <https://github.com/bitcoin-core/secp256k1/blob/master/src/modules/schnorr/schnorr_impl.h>`_
-     - `Z` : https://docs.zilliqa.com/whitepaper.pdf
+      * `BSI:TR03111 <https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/Publications/TechGuidelines/TR03111/BSI-TR-03111_pdf.html>`_
+      * `ISO/IEC:14888-3 <http://www.iso.org/iso/iso_catalogue/catalogue_ics/catalogue_detail_ics.htm?csnumber=43656>`_
+      * `bitcoin-core:libsecp256k1 <https://github.com/bitcoin-core/secp256k1/blob/master/src/modules/schnorr/schnorr_impl.h>`_
+      * `BIP:schnorr <https://github.com/sipa/bips/blob/bip-schnorr/bip-schnorr.mediawiki>`_
+      * `Z <https://docs.zilliqa.com/whitepaper.pdf>`_
 
     In order to select the specification to be conform to, choose 
-    the corresponding string option: "BSI", "ISO", "ISOx", "LIBSECP", "Z"
+    the corresponding string option: "BSI", "ISO", "ISOx", "LIBSECP",
+    "BIPSCHNORR", "Z". Default is "ISO".
 
     *Signature*:
 
-    - "BSI": compute r,s according to to BSI : 
+    "BSI": compute r,s according to to BSI : 
         1. k = RNG(1:n-1)
         2. Q = [k]G
-        3. r = H(M ||Qx)
-           If r = 0 mod n, goto 1.
-        4. s = k - r.d mod n
+        3. r = H(M||Qx)
+           If r = 0 mod(n), goto 1.
+        4. s = k - r.d mod(n)
            If s = 0 goto 1.
         5. Output (r, s)
-    - "ISO": compute r,s according to ISO : 
+    "ISO": compute r,s according to ISO : 
         1. k = RNG(1:n-1)
         2. Q = [k]G
-           If r = 0 mod n, goto 1.
+           If r = 0 mod(n), goto 1.
         3. r = H(Qx||Qy||M).
-        4. s = (k + r.d) mod n
+        4. s = (k + r.d) mod(n)
            If s = 0 goto 1.
         5. Output (r, s)
-    - "ISOx": compute r,s according to optimized ISO variant: 
+    "ISOx": compute r,s according to optimized ISO variant: 
         1. k = RNG(1:n-1)
         2. Q = [k]G
-           If r = 0 mod n, goto 1.
+           If r = 0 mod(n), goto 1.
         3. r = H(Qx||Qy||M).
-        4. s = (k + r.d) mod n
+        4. s = (k + r.d) mod(n)
            If s = 0 goto 1.
         5. Output (r, s)
-    - "LIBSECP": compute r,s according to bitcoin lib: 
+    "LIBSECP": compute r,s according to bitcoin lib: 
         1. k = RNG(1:n-1)
         2. Q = [k]G
            if Qy is odd, negate k and goto 2
-        3. r = Qx % n
-        4. h = H(r || m).
+        3. r = Qx mod(n)
+        4. h = H(r||m).
            if h == 0 or h >= order goto 1
         5. s = k - h.d.
         6. Output (r, s)
-    - "Z": compute r,s according to zilliqa lib:
-        1. Generate a random k from [1, ..., order-1]
+    "BIPSCHNORR": compute r,s according to BIP-schnorr standart:
+        1. k = H(kpriv||M[||suffix])
+           If jacobi(Qy, p) = 1 k = n-k
+        2. Q = [k]G
+        3. e = H(Qx||G.kpriv||M)
+        4. r = Qx mod(n)
+        5. s = (k + e.kpriv) mod(n)
+        6. Output (r, s)
+    "Z": compute r,s according to zilliqa lib:
+        1. Generate a random k from [1, ..., n-1]
         2. Compute the commitment Q = kG, where  G is the base point
         3. Compute the challenge r = H(Q, kpub, m) [CME: mod n according to pdf/code, Q and kpub compressed "02|03 x" according to code)
-        4. If r = 0 mod(order), goto 1
-        5. Compute s = k - r*kpriv mod(order)
+        4. If r = 0 mod(n), goto 1
+        5. Compute s = k - r*kpriv mod(n)
         6. If s = 0 goto 1.
         7. Output (r, s)
 
     *Verification*
 
-    - "BSI": verify r,s according to to BSI : 
+    "BSI": verify r,s according to to BSI : 
         1. Verify that r in {0, . . . , 2**t - 1} and s in {1, 2, . . . , n - 1}.
            If the check fails, output False and terminate.
         2. Q = [s]G + [r]W
            If Q = 0, output Error and terminate.
         3. v = H(M||Qx)
         4. Output True if v = r, and False otherwise.
-    - "ISO": verify r,s according to ISO : 
+    "ISO": verify r,s according to ISO : 
         1. check...
         2. Q = [s]G - [r]W
            If Q = 0, output Error and terminate.
         3. v = H(Qx||Qy||M).
         4. Output True if v = r, and False otherwise.
-    - "ISOx": verify r,s according to optimized ISO variant: 
+    "ISOx": verify r,s according to optimized ISO variant: 
         1. check...
         2. Q = [s]G - [r]W
            If Q = 0, output Error and terminate.
         3. v = H(Qx||M).
         4. Output True if v = r, and False otherwise.
-    - "LIBSECP": 
+    "LIBSECP": 
         1. Signature is invalid if s >= order.
            Signature is invalid if r >= p.
         2. h = H(r || m). 
@@ -114,38 +125,41 @@ class ECSchnorr:
         3. R = [h]Q + [s]G. 
            Signature is invalid if R is infinity or R's y coordinate is odd.
         4. Signature is valid if the serialization of R's x coordinate equals r.
-    - "Z":
+    "Z":
         1. Check if r,s is in [1, ..., order-1]
         2. Compute Q = sG + r*kpub
         3. If Q = O (the neutral point), return 0;
         4. r' = H(Q, kpub, m) [CME: mod n according to pdf/code, according to code), Q and kpub compressed "02|03 x"]
         5. return r' == r
 
-    Default is "ISO"
-    
     Args:
-      hasher (hashlib): callable constructor returning an object with update(), digest() interface. Example: hashlib.sha256,  hashlib.sha512...
-      option (str) : one of "BSI","ISO","ISOx","LIBSECP"
-      fmt (str) : in/out signature format. See :mod:`ecpy.formatters`
+        hasher (:mod:`hashlib`):
+            callable constructor returning an object with update(), digest()
+            interface. Example: hashlib.sha256,  hashlib.sha512...
+        option (:class:`str`):
+            one of "BSI", "ISO", "ISOx", "LIBSECP", "BIPSCHNORR" or "Z"
+        fmt (:class:`str`)
+            in/out signature format. See :mod:`ecpy.formatters`
     """
-    
+
     def __init__(self, hasher, option="ISO", fmt="DER"):
-        if not option in ("ISO","ISOx","BSI","LIBSECP","Z","SECP256K1"):
+        if not option in ("ISO","ISOx","BSI","LIBSECP","BIPSCHNORR","Z"):
             raise ECPyException('ECSchnorr option not supported: %s'%option)
         if not fmt in FORMATS:
             raise ECPyException('ECSchnorr format not supported: %s'%fmt)
 
         self._hasher = hasher
         self.fmt = fmt
-        self.maxtries=10
+        self.maxtries = 10
         self.option = option
         
     def sign(self, msg, pv_key):
-        """ Signs a message hash.
+        """
+        Signs a message hash.
 
         Args:
-            hash_msg (bytes)               : the message hash to sign
-            pv_key (ecpy.keys.ECPrivateKey): key to use for signing
+            msg (:class:`bytes`): the message hash to sign
+            pv_key (:class:`ecpy.keys.ECPrivateKey`): key to use for signing
         """
         order = pv_key.curve.order
         for i in range(1,self.maxtries):
@@ -156,40 +170,51 @@ class ECSchnorr:
         return None
 
     def sign_k(self, msg, pv_key, k):
-        """ Signs a message hash with provided random
+        """
+        Signs a message hash with provided random.
 
         Args:
-            hash_msg (bytes)               : the message hash to sign
-            pv_key (ecpy.keys.ECPrivateKey): key to use for signing
-            k (ecpy.keys.ECPrivateKey)     : random to use for signing
+            msg (:class:`bytes`): the message hash to sign
+            pv_key (:class:`ecpy.keys.ECPrivateKey`): key to use for signing
+            k (:class:`int`): random to use for signing. See :mod:`ecpy.ecrand`.
         """
         return self._do_sign(msg, pv_key, k)
 
     def sign_rfc6979(self, msg, pv_key, hasher=None):
-        """ Signs a message hash according to RFC6979 
+        """
+        Signs a message hash according to RFC6979.
+
         Args:
-            msg (bytes)                    : the message hash to sign
-            pv_key (ecpy.keys.ECPrivateKey): key to use for signing
+            msg (:class:`bytes`):
+                the message hash to sign
+            pv_key (:class:`ecpy.keys.ECPrivateKey`):
+                key to use for signing
+            hasher (:mod:`hashlib`):
+                callable constructor returning an object with update(), digest()
+                interface. Example: hashlib.sha256,  hashlib.sha512...
         """
         hasher = self._hasher if hasher == None else hasher
         field = pv_key.curve.field
         V = None
         for i in range(1, self.maxtries):
-            k,V = ecrand.rnd_rfc6979(msg, pv_key.d, field, self._hasher, V)
+            k,V = ecrand.rnd_rfc6979(msg, pv_key.d, field, hasher, V)
             sig = self._do_sign(msg, pv_key, k)
             if sig:
                 return sig
             return None
 
     # https://github.com/vihu/schnorr-python/blob/master/naive.py
-    def sign_secp256k1(self, msg, pv_key, algo16=b""):
+    def sign_bipschnorr(self, msg, pv_key, algo16=b""):
         """
-        Specific signature for SECP256K1 curve.
+        Signs a message hash according to bip-schnorr protocol. This protocol
+        is SECP256K1-curve-specific.
+
         Args:
-            msg (bytes)                    : the message hash to sign
-            pv_key (ecpy.keys.ECPrivateKey): key to use for signing
+            msg (:class:`bytes`): the message hash to sign
+            pv_key (:class:`ecpy.keys.ECPrivateKey`): key to use for signing
+            algo16 (:class:`bytes`): an optional 16-bytes-length suffix
         """
-        if pv_key.curve.name != 'secp256k1' or self.option != "SECP256K1":
+        if pv_key.curve.name != 'secp256k1' or self.option != "BIPSCHNORR":
             raise ECPyException("specific 'secp256k1' curve signature")
 
         size = pv_key.curve.size >> 3
@@ -267,7 +292,7 @@ class ECSchnorr:
 
         # https://github.com/sipa/bips/blob/bip-schnorr/bip-schnorr.mediawiki
         # https://github.com/vihu/schnorr-python/blob/master/naive.py
-        elif self.option == "SECP256K1":
+        elif self.option == "BIPSCHNORR":
             k = k if _jacobi(Q.y, pv_key.curve.field) == 1 else n-k
             data = Q.x.to_bytes(size, "big") + (G*pv_key.d).encode(compressed=True) + msg
             hasher.update(data)
@@ -276,14 +301,21 @@ class ECSchnorr:
             s = (k + e*pv_key.d) % n
         
         return encode_sig(r, s, self.fmt, 0 if self.fmt not in ["RAW", "EDDSA"] else size)
-            
+
     def verify(self, msg, sig, pu_key):
-        """ Verifies a message signature.                
+        """
+        Verifies a message signature.                
 
         Args:
-            msg (bytes)             : the message hash to verify the signature
-            sig (bytes)             : signature to verify
-            pu_key (ecpy.keys.ECPublicKey): key to use for verifying
+            msg (:class:`bytes`):
+                the message hash to verify the signature
+            sig (:class:`bytes`):
+                signature to verify
+            pu_key (:class:`ecpy.keys.ECPublicKey`):
+                public key to use for verifying
+
+        Returns:
+            :class:`bool`: true or false
         """
         curve = pu_key.curve
         n     = pu_key.curve.order
@@ -356,7 +388,7 @@ class ECSchnorr:
 
         # https://github.com/sipa/bips/blob/bip-schnorr/bip-schnorr.mediawiki
         # https://github.com/vihu/schnorr-python/blob/master/naive.py
-        elif self.option == "SECP256K1":
+        elif self.option == "BIPSCHNORR":
             if r >= pu_key.curve.field or s >= n:
                 return False
             hasher.update(r.to_bytes(size, "big") + pu_key.W.encode(compressed=True) + msg)
