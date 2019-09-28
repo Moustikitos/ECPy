@@ -26,20 +26,20 @@ FORMATS = ("DER", "BTUPLE", "ITUPLE", "RAW", "EDDSA")
 
 def encode_sig(r, s, fmt="DER", size=0):
     """
-    Encore signature according to format
+    Encore signature according to format.
 
     Args:
-        r (int)   r value
-        s (int)   s value
-        fmt (str) 'DER'|'BTUPLE'|'ITUPLE'|'RAW'|'EDDSA'
+        r (:class:`int`): r value
+        s (:class:`int`): s value
+        fmt (:class:`str`): 'DER'|'BTUPLE'|'ITUPLE'|'RAW'|'EDDSA'
 
     Returns:
-        bytes          for DER, RAW and EDDSA encoding
-    Returns:
-        (bytes, bytes) for BTUPLE encoding
-    Returns:
-        (int, int):    for ITUPLE encoding
+        encoded signature:
+            (:class:`bytes`) for DER, RAW and EDDSA encoding,
+            (:class:`bytes`, :class:`bytes`) for BTUPLE encoding,
+            (:class:`int`, :class:`int`) for ITUPLE encoding
     """
+
     r, s = int(r), int(s)
 
     if fmt == "DER":
@@ -75,14 +75,17 @@ def encode_sig(r, s, fmt="DER", size=0):
 
 def decode_sig(sig, fmt="DER") :
     """
-    Decode signature according to format
+    Decode signature according to format.
 
     Args:
-        sig     
-        fmt (str): 'DER'|'BTUPLE'|'ITUPLES'|'RAW'|'EDDSA'
+        sig:
+            (:class:`bytes`) for DER, RAW and EDDSA encoding, 
+            (:class:`bytes`, :class:`bytes`) for BTUPLE encoding,
+            (:class:`int`, :class:`int`) for ITUPLE encoding
+        fmt (:class:`str`): 'DER'|'BTUPLE'|'ITUPLES'|'RAW'|'EDDSA'
 
     Returns:
-       (int, int)
+        signature part (:class:`int`, :class:`int`): r and s value
     """
 
     if fmt == "DER":

@@ -1,4 +1,8 @@
-# encoding: UTF-8
+# -*- encoding:utf-8 -*-
+""" Elliptic Curve and Point manipulation.
+
+.. moduleauthor:: Cédric Mesnil <cedric.mesnil@ubinity.com>
+"""
 
 # Copyright 2016-2017 Cedric Mesnil <cedric.mesnil@ubinity.com>, Ubinity SAS
 #
@@ -14,10 +18,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-""" Elliptic Curve and Point manipulation.
-
-.. moduleauthor:: Cédric Mesnil <cedric.mesnil@ubinity.com>
-"""
+import binascii
+import hashlib
+import random
+import re
 
 # python 2 compatibility
 import future
@@ -26,11 +30,6 @@ try:
     from builtins import long
 except ImportError:
     long = int
-
-import binascii
-import hashlib
-import random
-import re
 
 from ecpy import encoders
 
@@ -46,18 +45,18 @@ class Curve(object):
     create a predefined curve.
 
     Supported well know elliptic curve are:
-        - Short Weierstrass: y²=x³+ax+b
-        - Twisted Edward: ax²+y²=1+dx²y²
-        - Montgomery: by²=x³+ax²+x
+      * Short Weierstrass: y²=x³+ax+b
+      * Twisted Edward: ax²+y²=1+dx²y²
+      * Montgomery: by²=x³+ax²+x
 
     Attributes:
-        - name (:class:`str`): curve name
-        - size (:class:`int`): bit size of curve
-        - a (:class:`int`): first curve parameter
-        - b, d (:class:`int`): second curve parameter
-        - field (:class:`int`): curve field
-        - generator (:class:`tuple`): curve point generator as int tuple
-        - order (:class:`int`): order of generator
+        name (:class:`str`): curve name
+        size (:class:`int`): bit size of curve
+        a (:class:`int`): first curve parameter
+        b, d (:class:`int`): second curve parameter
+        field (:class:`int`): curve field
+        generator (:class:`tuple`): curve point generator as int tuple
+        order (:class:`int`): order of generator
     """
 
     @staticmethod
@@ -114,7 +113,15 @@ class Curve(object):
         object.__setattr__(self, attr, value)
 
     def __str__(self):
-        return "<Curve\n    name: %s\n     G: %s\n>" % (self.name, self.generator)
+        return "<Curve\n    G: %s\n    size: %d>" % (self.generator, self.size)
+
+    def __call__(self, x):
+        if hasattr(self, "y_recover"):
+            return self.y_recover(self, x)
+
+    def __getitem__(self, y):
+        if hasattr(self, "x_recover"):
+            return self.x_recover(self, y)
 
     def is_on_curve(self, P):
         """
@@ -124,7 +131,7 @@ class Curve(object):
             P (:class:`ecpy.curves.Point`): Point to check
 
         Returns:
-            boolean: true if P is on curve
+            :class:`boolean`: true if P is on curve
         """        
         raise NotImplementedError('Abstract method is_on_curve')
 
@@ -154,7 +161,7 @@ class Curve(object):
         Returns:
             :class:`ecpy.curves.Point`: a new point R = P-Q
         """        
-        return self.add_point(P,Q.neg())
+        return self.add_point(P, Q.neg())
 
             
     def mul_point(self, k, P):
@@ -249,7 +256,7 @@ class WeierstrassCurve(Curve):
             Qx,Qy,Qz = self._aff2jac(Q.x,Q.y, q)            
             x,y,z = self._add_jac(Px,Py,Pz, Qx,Qy,Qz, q)        
         x,y = self._jac2aff(x,y,z, q)
-        PQ = Point(x,y, self)
+        PQ = Point(x, y, self)
         return PQ
 
     def mul_point(self, k, P):
@@ -486,14 +493,14 @@ class MontgomeryCurve(Curve):
         """See :func:`Curve.is_on_curve`."""
         p = self.field
         x = P.x
-        right = (x*x*x + self.a*x*x + x)%p
+        right = (x*x*x + self.a*x*x + x)
         if P.y:
             y     = P.y
-            left  = (self.b*y*y)%p
-            return left == right
+            left  = (self.b*y*y)
+            return left%p == right%p
         else:
             #check equation has a solution according to Euler criterion
-            return pow(right,(p-1)//2, p) == 1
+            return pow(right, (p-1)//2, p) == 1
 
     def y_recover(self, x, sign=0):
         """
@@ -508,7 +515,8 @@ class MontgomeryCurve(Curve):
            :class:`int`: y coordinate
         """
         p  = self.field
-        y2 = (x*x*x + self.a*x*x + x)%p
+        x2 = x*x
+        y2 = (x*x2 + self.a*x2 + x)%p
         y  = self._sqrt(y2, p, sign)
         return y
 
@@ -566,10 +574,9 @@ class MontgomeryCurve(Curve):
 class Point:
     """
     Immutable Elliptic Curve Point. A Point support the following operator:
-    
-      - point Addition `+` with automatic doubling support.
-      - scalar multiplication `*` between :class:`ecpy.curves.Point` and :class:`int`
-      - point comparison `==`
+      * point Addition `+` with automatic doubling support.
+      * scalar multiplication `*` between :class:`ecpy.curves.Point` and :class:`int`
+      * point comparison `==`
 
     Args:
         x (:class:`int`): x coordinate
@@ -580,44 +587,54 @@ class Point:
         :class:`ecpy.curves.ECPyException`: if point not on its attached curve
     """
 
-    __slots__ = '_x','_y','_curve', '_enc'
-    
-    def __init__(self, x, y, curve, check=True):  
-        self._curve = curve
-        self._enc = (encoders.Secp256k1 if hasattr(self._curve, "y_recover") else encoders.Eddsa04)(self._curve)
-        if x:
-            self._x = int(x)
-        if y:
-            self._y = int(y)
+    x = property(
+        lambda o: getattr(o, "_x", None),
+        lambda o,v: [
+            setattr(o, "_x", v),
+            setattr(o, "_y", getattr(o._curve, "y_recover", lambda *a,**k:getattr(o, "_y", None))(v,sign=False))
+        ],
+        None,
+        ""
+    )
+    y = property(
+        lambda o: getattr(o, "_y", None),
+        lambda o,v: [
+            setattr(o, "_y", v),
+            setattr(o, "_x", getattr(o._curve, "x_recover", lambda *a,**k:getattr(o, "_x", None))(v,sign=False))
+        ],
+        None,
+        ""
+    )
+    curve = property(
+        lambda o: getattr(o, "_curve", None),
+        lambda o,v: setattr(o, "_curve", v if isinstance(v, Curve) else Curve.get_curve(v)),
+        None,
+        ""
+    )
 
-        if x and not y and hasattr(curve, "y_recover"):
-            self._y = curve.y_recover(x, sign=True)
-            check = False
-        elif y and not x and hasattr(curve, "x_recover"):
-            self._x = curve.x_recover(y, sign=True)
-            check = False
+    def __init__(self, *args, **kw):
+        parameters = dict(
+            zip(("x", "y", "curve", "check"), args[:len(args)]),
+            **kw
+        )
+        x = parameters.get("x", None)
+        y = parameters.get("y", None)
+        check = parameters.get("check", True)
 
-        if not x or not y:
-            check = False
+        self.curve = parameters.get("curve", "secp256k1")
+        self._enc = (encoders.Secp256k1 if hasattr(self.curve, "y_recover") else encoders.Eddsa04)(self.curve)
 
-        if check and not curve.is_on_curve(self):
+        if x: self.x = int(x)
+        if y: self.y = int(y)
+
+        if not self.x or not self.y:
+            check = False
+        if check and not self.curve.is_on_curve(self):
             raise ECPyException("Point not on curve")
-        
-    @property
-    def x(self):
-        return self._x
-
-    @property
-    def y(self):
-        return self._y
-
-    @property
-    def curve(self):
-        return self._curve
     
     def __neg__(self):
         curve = self.curve
-        return Point(self.x,curve.field-self.y, curve)
+        return Point(self.x, curve.field-self.y, curve)
     
     def __add__(self, Q):
         if isinstance(Q,  Point) :
@@ -641,15 +658,17 @@ class Point:
     
     def __eq__(self, Q):
         if isinstance(Q, Point) :
-            return ((self._curve.name == Q._curve.name or
-                     self._curve.name == None or
-                     Q._curve.name    == None ) and
-                    self._x == Q._x and
-                    self._y == Q._y)
+            sc_name = self.curve.name
+            Qc_name =  Q.curve.name
+            return ((sc_name == Qc_name or
+                     sc_name == None or
+                     Qc_name == None ) and
+                     self.x == Q.x and
+                     self.y == Q.y)
         raise NotImplementedError('eq: type not supported: %s'%(type(Q)))
 
     def __str__(self):
-        return "    x: %x\n    y: %x\n    point on '%s' curve" % (self._x, self._y, self._curve.name)
+        return "<Point\n    x: %x\n    y: %x\n    point on '%s' curve>" % (self._x, self._y, self._curve.name)
 
     def neg(self):
         return self.__neg__()
@@ -1277,7 +1296,7 @@ if __name__ == "__main__":
         ##################################
         ### Montgomery quick check ###
         ##################################
-        cv     = Curve.get_curve('Curve25519')
+        cv = Curve.get_curve('Curve25519')
 
         #0x449a44ba44226a50185afcc10a4c1462dd5e46824b15163b9d7c52f06be346a0
         k = binascii.unhexlify("a546e36bf0527c9d3b16154b82465edd62144c0ac1fc5a18506a2244ba449ac4")

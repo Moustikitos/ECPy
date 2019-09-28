@@ -10,6 +10,8 @@ Welcome to ECPy's documentation!
    :maxdepth: 2
    :caption: Contents:
 
+   encoders
+   formatters
    keys
    curves
 

@@ -24,7 +24,6 @@ from builtins import int, pow
 
 
 class ECPublicKey:
-    # TODO: public key is actually a point on a curve, so should extends :class:`ecpy.curves.Point`
     """
     Elliptic curve public key. Can be used for both ECDSA and EDDSA signature.
 
@@ -60,7 +59,7 @@ class ECPublicKey:
         return ECPrivateKey.from_secret(secret, curve, hasher=hasher, encoding=encoding).get_public_key()
 
     def __str__(self):
-        return "<ECPublicKey\n    W: %s\n>" % self.W
+        return "<ECPublicKey\n    W: %s>" % self.W
         
     def encode_point(self, compressed=False):
         """
@@ -90,16 +89,21 @@ class ECPrivateKey:
         Create a private key from secret passphrase.
 
         Args:
-            secret (:class:`str` or :class:`bytes`): passphrase given as bytes or string sequence
-            curve (:class:`ecpy.curves.Curve`): the elliptic curve to use
-            hasher (:func:`func`): valid hash definition
-            encoding (:class:`str`): passphrase encoding if given as a bytes sequence
+            secret (:class:`str` or :class:`bytes`):
+                passphrase given as bytes or string sequence
+            curve (:class:`ecpy.curves.Curve`):
+                the elliptic curve to use
+            hasher (:func:`func`):
+                valid hash definition
+            encoding (:class:`str`):
+                passphrase encoding if given as a bytes sequence
 
         Returns:
             :class:`ecpy.keys.ECPrivateKey`: private key
 
         Raises:
-            :class:`ValueError`: if the hasher did not issue a valid bytes sequence.
+            :class:`ValueError`:
+                if the hasher did not issue a valid bytes sequence.
         """
         size = curve.size
         order = curve.order
@@ -128,7 +132,7 @@ class ECPrivateKey:
         self.curve = curve
 
     def __str__(self):
-        return "<ECPrivateKey\n    d: %x\n>" % self.d
+        return "<ECPrivateKey\n    d: %x>" % self.d
 
     def get_public_key(self):
         """

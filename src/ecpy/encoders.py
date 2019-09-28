@@ -37,10 +37,10 @@ class Encoder:
     def encode(self, x, y):
         """
         Args:
-            x, y (int) : curve point to convert
+            x,y (:class:`int`, :class:`int`): curve point to convert
 
-        Returns
-            bytes
+        Returns:
+            :class:`bytes`: encoded point
         """
         if x and isinstance(x, long): x = int(x)
         if y and isinstance(y, long): y = int(y)
@@ -52,10 +52,10 @@ class Encoder:
     def decode(self, data, curve):
         """
         Args:
-            data (bytes) : encoded point
+            data (:class:`bytes`): encoded point
 
-        Returns
-            (int, int)
+        Returns:
+            (:class:`int`, :class:`int`): point coordinates
         """
         raise NotImplementedError()
 
@@ -63,9 +63,9 @@ class Encoder:
 class Secp256k1(Encoder):
     """
     Standart point serialisation.
-    - 02 | x      for even x in compressed form
-    - 03 | x      for odd x in compressed form
-    - 04 | x | y  for uncompressed form
+      * `02|x` for even x in compressed form
+      * `03|x`  for odd x in compressed form
+      * `04|x|y` for uncompressed form
     """
 
     def _get_length(self, curve):
@@ -140,8 +140,8 @@ class Eddsa04(Encoder):
 class P1363_2000(Encoder):
     """
     *P1363-2000* point serialisation.
-    - 02 | x | sign(y) for compressed form
-    - 04 | x | y for uncompressed form
+      * `02|x|sign(y)` for compressed form
+      * `04|x|y` for uncompressed form
     """
 
     def _encode(self, x, y):
@@ -166,13 +166,13 @@ class P1363_2000(Encoder):
 
 def decode_scalar_25519(data):
     """
-    Decode scalar according to RF7748 and draft-irtf-cfrg-eddsa
+    Decode scalar according to *RF7748* and *draft-irtf-cfrg-eddsa*
 
     Args:
-        data (bytes) : data to decode
+        data (:class:`bytes`): data to decode
 
     Returns:
-        int
+        :class:`int`: scalar value
     """
     k = bytearray(data)
     k[0]  &= 0xf8
