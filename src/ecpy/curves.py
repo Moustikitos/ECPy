@@ -581,6 +581,7 @@ class Point:
     Args:
         x (:class:`int`): x coordinate
         y (:class:`int`): y coordinate
+        curve (:class:`ecpy.curves.Curve`): curve on wich the point is 
         check (:class:`bool`): if True enforce x,y is on curve
 
     Raises:

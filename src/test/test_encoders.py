@@ -13,20 +13,19 @@ class TestEncoders(unittest.TestCase):
 
 	@classmethod
 	def setUpClass(self):
-		self.secp256k1 = Curve.get_curve('secp256k1')
 		self.r = 0x24653eac434488002cc06bbfb7f10fe18991e35f9fe4302dbea6d2353dc0ab1c
 		self.s = 0xacd417b277ab7e7d993cc4a601dd01a71696fd0dd2e93561d9de9b69dd4dc75c
+
+		self.secp256k1 = Curve.get_curve('secp256k1')
 		self.P1 = Point(
 			0x6fb13b7e8ab1c7d191d16197c1bf7f8dc7992412e1266155b3fb3ac8b30f3ed8,
-			0x2e1eb77bd89505113819600b395e0475d102c4788a3280a583d9d82625ed8533,
-			self.secp256k1,
 			check=True)
 
 		self.ed25519 = Curve.get_curve('Ed25519')
 		self.P2 = Point(
-			0x67ae9c4a22928f491ff4ae743edac83a6343981981624886ac62485fd3f8e25c,
+			None,
 			0x1267b1d177ee69aba126a18e60269ef79f16ec176724030402c3684878f5b4d4,
-			self.ed25519,
+			'Ed25519',
 			check=True)
 
 		self.curve25519 = Curve.get_curve('Curve25519')
