@@ -25,6 +25,16 @@ except ImportError:
 class Encoder:
     """
     Naive encoder class.
+
+    Attributes:
+        compressed (:class:`bool`):
+            a flag to compress encoded point
+        length (:class:`int`):
+            byte-length used for :class:`int` - :class:`bytes` conversion
+
+    Parameters:
+        curve (:class:`ecpy.curves.Curve`): the associated curve
+        compressed (:class:`bool`): compression flag
     """
 
     def __init__(self, curve, compressed=True):
@@ -63,9 +73,9 @@ class Encoder:
 class Secp256k1(Encoder):
     """
     Standart point serialisation.
-      * `02|x` for even x in compressed form
-      * `03|x`  for odd x in compressed form
-      * `04|x|y` for uncompressed form
+      * ``02|x`` for even x in compressed form
+      * ``03|x``  for odd x in compressed form
+      * ``04|x|y`` for uncompressed form
     """
 
     def _get_length(self, curve):
@@ -95,6 +105,9 @@ class Secp256k1(Encoder):
 
 
 class Rfc87748(Encoder):
+    """
+    Only valid encoder within ``MONTGOMERY`` curve.
+    """
 
     def _get_length(self, curve):
         if curve.type == "montgomery":
@@ -113,6 +126,9 @@ class Rfc87748(Encoder):
 
 
 class Eddsa04(Encoder):
+    """
+    Only valid encoder within ``ED25519`` or ``Ed448`` curve.
+    """
 
     def _get_length(self, curve):
         if curve.name == 'Ed25519':
@@ -139,9 +155,9 @@ class Eddsa04(Encoder):
 
 class P1363_2000(Encoder):
     """
-    *P1363-2000* point serialisation.
-      * `02|x|sign(y)` for compressed form
-      * `04|x|y` for uncompressed form
+    ``P1363-2000`` point serialisation.
+      * ``02|x|sign(y)`` for compressed form
+      * ``04|x|y`` for uncompressed form
     """
 
     def _encode(self, x, y):
@@ -166,7 +182,7 @@ class P1363_2000(Encoder):
 
 def decode_scalar_25519(data):
     """
-    Decode scalar according to *RF7748* and *draft-irtf-cfrg-eddsa*
+    Decode scalar according to ``RF7748`` and ``draft-irtf-cfrg-eddsa``
 
     Args:
         data (:class:`bytes`): data to decode

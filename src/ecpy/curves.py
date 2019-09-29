@@ -574,9 +574,9 @@ class MontgomeryCurve(Curve):
 class Point:
     """
     Immutable Elliptic Curve Point. A Point support the following operator:
-      * point Addition `+` with automatic doubling support.
-      * scalar multiplication `*` between :class:`ecpy.curves.Point` and :class:`int`
-      * point comparison `==`
+      * point Addition ``+`` with automatic doubling support.
+      * scalar multiplication ``*`` between :class:`ecpy.curves.Point` and :class:`int`
+      * point comparison ``==``
 
     Args:
         x (:class:`int`): x coordinate

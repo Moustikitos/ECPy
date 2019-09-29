@@ -18,10 +18,10 @@
     >>> Q = k * P
     >>> R = P + Q
     >>> print(R)
-        <Point
-            x: 1f660f74ade02f05292a3b4f224e2a90a66a239842c34f3669350cd74a1701aa
-            y: 54dcb6934bdce048f109e466f5f17b43b2d3b4465d371563b45b3cd32c341100
-            point on 'secp256k1' curve>
+    <Point
+        x: 1f660f74ade02f05292a3b4f224e2a90a66a239842c34f3669350cd74a1701aa
+        y: 54dcb6934bdce048f109e466f5f17b43b2d3b4465d371563b45b3cd32c341100
+        point on 'secp256k1' curve>
 
 .. automodule:: ecpy.curves
    :members:

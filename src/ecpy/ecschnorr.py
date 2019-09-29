@@ -34,19 +34,18 @@ class ECSchnorr:
     """
     ECSchnorr signer implementation according to:
  
-      * `BSI:TR03111 <https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/Publications/TechGuidelines/TR03111/BSI-TR-03111_pdf.html>`_
-      * `ISO/IEC:14888-3 <http://www.iso.org/iso/iso_catalogue/catalogue_ics/catalogue_detail_ics.htm?csnumber=43656>`_
-      * `bitcoin-core:libsecp256k1 <https://github.com/bitcoin-core/secp256k1/blob/master/src/modules/schnorr/schnorr_impl.h>`_
-      * `BIP:schnorr <https://github.com/sipa/bips/blob/bip-schnorr/bip-schnorr.mediawiki>`_
-      * `Z <https://docs.zilliqa.com/whitepaper.pdf>`_
+      * `BSI: TR03111 <https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/Publications/TechGuidelines/TR03111/BSI-TR-03111_V-2-1_pdf.pdf>`_
+      * `ISO/x: 14888-3 <http://www.iso.org/iso/iso_catalogue/catalogue_ics/catalogue_detail_ics.htm?csnumber=43656>`_
+      * `BIP: schnorr <https://github.com/sipa/bips/blob/bip-schnorr/bip-schnorr.mediawiki>`_
+      * `Z: zilliqa <https://docs.zilliqa.com/whitepaper.pdf>`_
 
     In order to select the specification to be conform to, choose 
-    the corresponding string option: "BSI", "ISO", "ISOx", "LIBSECP",
-    "BIPSCHNORR", "Z". Default is "ISO".
+    the corresponding string option: ``BSI``, ``ISO``, ``ISOx``, ``BIP``, ``Z``.
+    Default is ``ISO``.
 
     *Signature*:
 
-    "BSI": compute r,s according to to BSI : 
+    Compute r,s according to to BSI: 
         1. k = RNG(1:n-1)
         2. Q = [k]G
         3. r = H(M||Qx)
@@ -54,7 +53,7 @@ class ECSchnorr:
         4. s = k - r.d mod(n)
            If s = 0 goto 1.
         5. Output (r, s)
-    "ISO": compute r,s according to ISO : 
+    Compute r,s according to ISO: 
         1. k = RNG(1:n-1)
         2. Q = [k]G
            If r = 0 mod(n), goto 1.
@@ -62,7 +61,7 @@ class ECSchnorr:
         4. s = (k + r.d) mod(n)
            If s = 0 goto 1.
         5. Output (r, s)
-    "ISOx": compute r,s according to optimized ISO variant: 
+    Compute r,s according to optimized ISO variant: 
         1. k = RNG(1:n-1)
         2. Q = [k]G
            If r = 0 mod(n), goto 1.
@@ -70,16 +69,7 @@ class ECSchnorr:
         4. s = (k + r.d) mod(n)
            If s = 0 goto 1.
         5. Output (r, s)
-    "LIBSECP": compute r,s according to bitcoin lib: 
-        1. k = RNG(1:n-1)
-        2. Q = [k]G
-           if Qy is odd, negate k and goto 2
-        3. r = Qx mod(n)
-        4. h = H(r||m).
-           if h == 0 or h >= order goto 1
-        5. s = k - h.d.
-        6. Output (r, s)
-    "BIPSCHNORR": compute r,s according to BIP-schnorr standart:
+    Compute r,s according to BIP-schnorr standart:
         1. k = H(kpriv||M[||suffix])
            If jacobi(Qy, p) = 1 k = n-k
         2. Q = [k]G
@@ -87,7 +77,7 @@ class ECSchnorr:
         4. r = Qx mod(n)
         5. s = (k + e.kpriv) mod(n)
         6. Output (r, s)
-    "Z": compute r,s according to zilliqa lib:
+    Compute r,s according to zilliqa lib:
         1. Generate a random k from [1, ..., n-1]
         2. Compute the commitment Q = kG, where  G is the base point
         3. Compute the challenge r = H(Q, kpub, m) [CME: mod n according to pdf/code, Q and kpub compressed "02|03 x" according to code)
@@ -98,34 +88,26 @@ class ECSchnorr:
 
     *Verification*
 
-    "BSI": verify r,s according to to BSI : 
+    Verify r,s according to to BSI : 
         1. Verify that r in {0, . . . , 2**t - 1} and s in {1, 2, . . . , n - 1}.
            If the check fails, output False and terminate.
         2. Q = [s]G + [r]W
            If Q = 0, output Error and terminate.
         3. v = H(M||Qx)
         4. Output True if v = r, and False otherwise.
-    "ISO": verify r,s according to ISO : 
+    Verify r,s according to ISO : 
         1. check...
         2. Q = [s]G - [r]W
            If Q = 0, output Error and terminate.
         3. v = H(Qx||Qy||M).
         4. Output True if v = r, and False otherwise.
-    "ISOx": verify r,s according to optimized ISO variant: 
+    Verify r,s according to optimized ISO variant: 
         1. check...
         2. Q = [s]G - [r]W
            If Q = 0, output Error and terminate.
         3. v = H(Qx||M).
         4. Output True if v = r, and False otherwise.
-    "LIBSECP": 
-        1. Signature is invalid if s >= order.
-           Signature is invalid if r >= p.
-        2. h = H(r || m). 
-           Signature is invalid if h == 0 or h >= order.
-        3. R = [h]Q + [s]G. 
-           Signature is invalid if R is infinity or R's y coordinate is odd.
-        4. Signature is valid if the serialization of R's x coordinate equals r.
-    "Z":
+    Verify r,s according to zilliqa lib:
         1. Check if r,s is in [1, ..., order-1]
         2. Compute Q = sG + r*kpub
         3. If Q = O (the neutral point), return 0;
@@ -135,15 +117,16 @@ class ECSchnorr:
     Args:
         hasher (:mod:`hashlib`):
             callable constructor returning an object with update(), digest()
-            interface. Example: hashlib.sha256,  hashlib.sha512...
+            interface. Example: :class:`hashlib.sha256`, :class:`hashlib.sha512`...
         option (:class:`str`):
-            one of "BSI", "ISO", "ISOx", "LIBSECP", "BIPSCHNORR" or "Z"
+            one of ``BSI``, ``ISO``, ``ISOx``, ``BIP`` or
+            ``Z``
         fmt (:class:`str`)
             in/out signature format. See :mod:`ecpy.formatters`
     """
 
     def __init__(self, hasher, option="ISO", fmt="DER"):
-        if not option in ("ISO","ISOx","BSI","LIBSECP","BIPSCHNORR","Z"):
+        if not option in ("ISO","ISOx","BSI","BIP","Z"):
             raise ECPyException('ECSchnorr option not supported: %s'%option)
         if not fmt in FORMATS:
             raise ECPyException('ECSchnorr format not supported: %s'%fmt)
@@ -180,7 +163,7 @@ class ECSchnorr:
         """
         return self._do_sign(msg, pv_key, k)
 
-    def sign_rfc6979(self, msg, pv_key, hasher=None):
+    def sign_rfc6979(self, msg, pv_key):
         """
         Signs a message hash according to RFC6979.
 
@@ -193,18 +176,17 @@ class ECSchnorr:
                 callable constructor returning an object with update(), digest()
                 interface. Example: hashlib.sha256,  hashlib.sha512...
         """
-        hasher = self._hasher if hasher == None else hasher
         field = pv_key.curve.field
         V = None
         for i in range(1, self.maxtries):
-            k,V = ecrand.rnd_rfc6979(msg, pv_key.d, field, hasher, V)
+            k,V = ecrand.rnd_rfc6979(msg, pv_key.d, field, self._hasher, V)
             sig = self._do_sign(msg, pv_key, k)
             if sig:
                 return sig
             return None
 
     # https://github.com/vihu/schnorr-python/blob/master/naive.py
-    def sign_bipschnorr(self, msg, pv_key, algo16=b""):
+    def sign_bip(self, msg, pv_key, algo16=b""):
         """
         Signs a message hash according to bip-schnorr protocol. This protocol
         is SECP256K1-curve-specific.
@@ -214,7 +196,7 @@ class ECSchnorr:
             pv_key (:class:`ecpy.keys.ECPrivateKey`): key to use for signing
             algo16 (:class:`bytes`): an optional 16-bytes-length suffix
         """
-        if pv_key.curve.name != 'secp256k1' or self.option != "BIPSCHNORR":
+        if pv_key.curve.name != 'secp256k1' or self.option != "BIP":
             raise ECPyException("specific 'secp256k1' curve signature")
 
         size = pv_key.curve.size >> 3
@@ -262,16 +244,16 @@ class ECSchnorr:
             if r==0 or s==0:
                 return None
 
-        elif self.option == "LIBSECP":
-            if Q.y & 1:
-                k = n-k
-                Q = G*k
-            r = (Q.x%n).to_bytes(size,'big')
-            hasher.update(r+msg)
-            h = hasher.digest()
-            h = int.from_bytes(h,'big')
-            r = Q.x % n
-            s = (k - h*pv_key.d)%n
+        # elif self.option == "LIBSECP":
+        #     if Q.y & 1:
+        #         k = n-k
+        #         Q = G*k
+        #     r = (Q.x%n).to_bytes(size,'big')
+        #     hasher.update(r+msg)
+        #     h = hasher.digest()
+        #     h = int.from_bytes(h,'big')
+        #     r = Q.x % n
+        #     s = (k - h*pv_key.d)%n
 
         elif self.option == "Z":
             if Q.y & 1:
@@ -292,7 +274,7 @@ class ECSchnorr:
 
         # https://github.com/sipa/bips/blob/bip-schnorr/bip-schnorr.mediawiki
         # https://github.com/vihu/schnorr-python/blob/master/naive.py
-        elif self.option == "BIPSCHNORR":
+        elif self.option == "BIP":
             k = k if _jacobi(Q.y, pv_key.curve.field) == 1 else n-k
             data = Q.x.to_bytes(size, "big") + (G*pv_key.d).encode(compressed=True) + msg
             hasher.update(data)
@@ -357,17 +339,17 @@ class ECSchnorr:
             v = hasher.digest()
             v = int.from_bytes(v,'big')
 
-        elif self.option == "LIBSECP":
-            rb = r.to_bytes(size,'big') 
-            hasher.update(rb+msg)
-            h = hasher.digest()
-            h = int.from_bytes(h,'big')
-            if h == 0 or h > n :
-                return 0
-            sG = s * G
-            hW = h*pu_key.W
-            R = sG + hW
-            v = R.x % n
+        # elif self.option == "LIBSECP":
+        #     rb = r.to_bytes(size,'big') 
+        #     hasher.update(rb+msg)
+        #     h = hasher.digest()
+        #     h = int.from_bytes(h,'big')
+        #     if h == 0 or h > n :
+        #         return 0
+        #     sG = s * G
+        #     hW = h*pu_key.W
+        #     R = sG + hW
+        #     v = R.x % n
 
         elif self.option == "Z":
             sG = s * G
@@ -388,7 +370,7 @@ class ECSchnorr:
 
         # https://github.com/sipa/bips/blob/bip-schnorr/bip-schnorr.mediawiki
         # https://github.com/vihu/schnorr-python/blob/master/naive.py
-        elif self.option == "BIPSCHNORR":
+        elif self.option == "BIP":
             if r >= pu_key.curve.field or s >= n:
                 return False
             hasher.update(r.to_bytes(size, "big") + pu_key.W.encode(compressed=True) + msg)
@@ -399,7 +381,8 @@ class ECSchnorr:
             v = Q.x % n
 
         return v == r
- 
+
+
 if __name__ == "__main__":
     import sys
     try:

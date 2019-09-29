@@ -11,7 +11,7 @@ from ecpy.ecschnorr import ECSchnorr
 
 class TestEcschnorr(unittest.TestCase):
 
-	types = ["ISO","ISOx","BSI","LIBSECP","Z","BIPSCHNORR"]
+	types = ["ISO","ISOx","BSI","Z","BIP"]
 
 	@classmethod
 	def setUpClass(self):
@@ -36,8 +36,8 @@ class TestEcschnorr(unittest.TestCase):
 			msg = signer._hasher(self.msg).digest()
 			self.assertEqual(True, signer.verify(msg, signer.sign_rfc6979(msg, self.privK), self.pubK))
 
-	def test_sign_bipschnorr(self):
-		signer = getattr(self, "bipschnorr")
+	def test_sign_bip(self):
+		signer = getattr(self, "bip")
 		msg = signer._hasher(self.msg).digest()
-		self.assertEqual(True, signer.verify(msg, signer.sign_bipschnorr(msg, self.privK), self.pubK))
+		self.assertEqual(True, signer.verify(msg, signer.sign_bip(msg, self.privK), self.pubK))
 
