@@ -1,3 +1,4 @@
+# -*- encoding:utf-8 -*-
 # Copyright 2016 Cedric Mesnil <cedric.mesnil@ubinity.com>, Ubinity SAS
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -22,12 +23,18 @@ from ecpy.formatters import decode_sig, encode_sig, FORMATS
 from ecpy import ecrand
 from ecpy.curves import ECPyException
 
+import ecpy.bip_schnorr as _schnorr
 import hashlib
 import binascii
 
 
-def _jacobi(x, p):
-    return pow(x, (p - 1) // 2, p)
+jacobi = lambda x,p: pow(x, (p - 1) // 2, p)
+is_quad = lambda x,p: jacobi(x, p) == 1
+
+
+def tagged_hash(tag, msg, hasher):
+    tag_hash = hasher(tag.encode("utf-8") if not isinstance(tag, bytes) else tag).digest()
+    return hasher(tag_hash + tag_hash + msg).digest()
 
 
 class ECSchnorr:
@@ -138,7 +145,7 @@ class ECSchnorr:
         
     def sign(self, msg, pv_key):
         """
-        Signs a message hash.
+        Sign a message hash.
 
         Args:
             msg (:class:`bytes`): the message hash to sign
@@ -154,18 +161,21 @@ class ECSchnorr:
 
     def sign_k(self, msg, pv_key, k):
         """
-        Signs a message hash with provided random.
+        Sign a message hash with provided random.
 
         Args:
             msg (:class:`bytes`): the message hash to sign
             pv_key (:class:`ecpy.keys.ECPrivateKey`): key to use for signing
             k (:class:`int`): random to use for signing. See :mod:`ecpy.ecrand`.
+
+        Returns:
+            :class:(`(int, int)`): tupple containing r and s parts.
         """
         return self._do_sign(msg, pv_key, k)
 
     def sign_rfc6979(self, msg, pv_key):
         """
-        Signs a message hash according to RFC6979.
+        Sign a message hash according to RFC6979.
 
         Args:
             msg (:class:`bytes`):
@@ -175,6 +185,9 @@ class ECSchnorr:
             hasher (:mod:`hashlib`):
                 callable constructor returning an object with update(), digest()
                 interface. Example: hashlib.sha256,  hashlib.sha512...
+
+        Returns:
+            :class:(`(int, int)`): tupple containing r and s parts.
         """
         field = pv_key.curve.field
         V = None
@@ -185,37 +198,58 @@ class ECSchnorr:
                 return sig
             return None
 
-    # https://github.com/vihu/schnorr-python/blob/master/naive.py
-    def sign_bip(self, msg, pv_key, algo16=b""):
+    # https://github.com/sipa/bips/blob/bip-schnorr/bip-schnorr.mediawiki
+    # https://github.com/sipa/bips/blob/bip-schnorr/bip-schnorr/reference.py
+    def bip_sign(self, msg, pv_key):
         """
-        Signs a message hash according to bip-schnorr protocol. This protocol
+        Sign a message hash according to bip-schnorr protocol. This protocol
         is SECP256K1-curve-specific.
 
         Args:
             msg (:class:`bytes`): the message hash to sign
             pv_key (:class:`ecpy.keys.ECPrivateKey`): key to use for signing
-            algo16 (:class:`bytes`): an optional 16-bytes-length suffix
-        """
-        if pv_key.curve.name != 'secp256k1' or self.option != "BIP":
-            raise ECPyException("specific 'secp256k1' curve signature")
 
-        size = pv_key.curve.size >> 3
-        data = pv_key.d.to_bytes(size, "big") + msg + algo16[:16]
-        k = int.from_bytes(self._hasher(data).digest(), "big")
-        if k == 0:
-            raise ECPyException("signature failed")
-        return self._do_sign(msg, pv_key, k)
+        Returns:
+            :class:(`(int, int)`): tupple containing r and s parts.
+        """
+        size = pv_key.curve.size>>3
+        seckey0 = pv_key.d.to_bytes(size, "big")
+        r, s = decode_sig(_schnorr.schnorr_sign(msg, seckey0), "RAW")
+        return encode_sig(r, s, self.fmt, 0 if self.fmt not in ["RAW", "EDDSA"] else size)
+
+    # https://github.com/sipa/bips/blob/bip-schnorr/bip-schnorr.mediawiki
+    # https://github.com/sipa/bips/blob/bip-schnorr/bip-schnorr/reference.py
+    def bip_verify(self, msg, sig, pu_key):
+        """
+        Verify a message signature according to bip-schnorr protocol. This protocol
+        is SECP256K1-curve-specific.
+
+        Args:
+            msg (:class:`bytes`):
+                the message hash to verify the signature
+            sig (:class:`bytes`):
+                signature to verify
+            pu_key (:class:`ecpy.keys.ECPublicKey`):
+                public key to use for verifying
+
+        Returns:
+            :class:`bool`: true or false
+        """
+        pubkey = pu_key.W.x.to_bytes(pu_key.W.curve.size>>3, "big")
+        return _schnorr.schnorr_verify(msg, pubkey, sig)
 
     def _do_sign(self, msg, pv_key, k):
         if (pv_key.curve == None):
             raise ECPyException('private key has no curve')
         curve = pv_key.curve
         n     = curve.order
+        p     = curve.field
         G     = curve.generator
         size  = curve.size>>3
         
         Q = G*k
         hasher = self._hasher()
+
         if self.option == "ISO":
             xQ = (Q.x).to_bytes(size,'big')        
             yQ = (Q.y).to_bytes(size,'big')
@@ -244,27 +278,10 @@ class ECSchnorr:
             if r==0 or s==0:
                 return None
 
-        # elif self.option == "LIBSECP":
-        #     if Q.y & 1:
-        #         k = n-k
-        #         Q = G*k
-        #     r = (Q.x%n).to_bytes(size,'big')
-        #     hasher.update(r+msg)
-        #     h = hasher.digest()
-        #     h = int.from_bytes(h,'big')
-        #     r = Q.x % n
-        #     s = (k - h*pv_key.d)%n
-
         elif self.option == "Z":
-            if Q.y & 1:
-                xQ = b'\x03'+Q.x.to_bytes(size,'big')
-            else :
-                xQ = b'\x02'+Q.x.to_bytes(size,'big')
             pu_key = pv_key.get_public_key()
-            if pu_key.W.y & 1:
-                xPub = b'\x03'+pu_key.W.x.to_bytes(size,'big')
-            else :
-                xPub = b'\x02'+pu_key.W.x.to_bytes(size,'big')
+            xQ = Q.encode(compressed=True)
+            xPub = pu_key.W.encode(compressed=True)
             hasher.update(xQ+xPub+msg)
             r = hasher.digest()
             r = int.from_bytes(r,'big') % n
@@ -272,21 +289,11 @@ class ECSchnorr:
             if r==0 or s==0:
                 return None
 
-        # https://github.com/sipa/bips/blob/bip-schnorr/bip-schnorr.mediawiki
-        # https://github.com/vihu/schnorr-python/blob/master/naive.py
-        elif self.option == "BIP":
-            k = k if _jacobi(Q.y, pv_key.curve.field) == 1 else n-k
-            data = Q.x.to_bytes(size, "big") + (G*pv_key.d).encode(compressed=True) + msg
-            hasher.update(data)
-            e = int.from_bytes(hasher.digest(), "big")
-            r = Q.x % n
-            s = (k + e*pv_key.d) % n
-        
         return encode_sig(r, s, self.fmt, 0 if self.fmt not in ["RAW", "EDDSA"] else size)
 
     def verify(self, msg, sig, pu_key):
         """
-        Verifies a message signature.                
+        Verifies a message signature.
 
         Args:
             msg (:class:`bytes`):
@@ -301,6 +308,7 @@ class ECSchnorr:
         """
         curve = pu_key.curve
         n     = pu_key.curve.order
+        p     = pu_key.curve.field
         G     = pu_key.curve.generator
         size  = curve.size>>3
         
@@ -311,6 +319,7 @@ class ECSchnorr:
             s > n-1     ) :
             return False
         hasher = self._hasher()
+
         if self.option == "ISO":
             sG = s * G
             rW = r*pu_key.W
@@ -339,46 +348,16 @@ class ECSchnorr:
             v = hasher.digest()
             v = int.from_bytes(v,'big')
 
-        # elif self.option == "LIBSECP":
-        #     rb = r.to_bytes(size,'big') 
-        #     hasher.update(rb+msg)
-        #     h = hasher.digest()
-        #     h = int.from_bytes(h,'big')
-        #     if h == 0 or h > n :
-        #         return 0
-        #     sG = s * G
-        #     hW = h*pu_key.W
-        #     R = sG + hW
-        #     v = R.x % n
-
         elif self.option == "Z":
             sG = s * G
             rW = r*pu_key.W
             Q = sG + rW
-            if Q.y & 1:
-                xQ = b'\x03'+Q.x.to_bytes(size,'big')
-            else :
-                xQ = b'\x02'+Q.x.to_bytes(size,'big')
-            if pu_key.W.y & 1:
-                xPub = b'\x03'+pu_key.W.x.to_bytes(size,'big')
-            else :
-                xPub = b'\x02'+pu_key.W.x.to_bytes(size,'big')
+            xQ = Q.encode(compressed=True)
+            xPub = pu_key.W.encode(compressed=True)
             hasher.update(xQ+xPub+msg)
             v = hasher.digest()
             v = int.from_bytes(v,'big')
             v = v%n
-
-        # https://github.com/sipa/bips/blob/bip-schnorr/bip-schnorr.mediawiki
-        # https://github.com/vihu/schnorr-python/blob/master/naive.py
-        elif self.option == "BIP":
-            if r >= pu_key.curve.field or s >= n:
-                return False
-            hasher.update(r.to_bytes(size, "big") + pu_key.W.encode(compressed=True) + msg)
-            e = int.from_bytes(hasher.digest(), "big")
-            Q = s*G + (n-e)*pu_key.W
-            if _jacobi(Q.y, pu_key.curve.field) != 1:
-                return False
-            v = Q.x % n
 
         return v == r
 

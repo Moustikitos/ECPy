@@ -669,7 +669,7 @@ class Point:
         raise NotImplementedError('eq: type not supported: %s'%(type(Q)))
 
     def __str__(self):
-        return "<Point\n    x: %x\n    y: %x\n    point on '%s' curve>" % (self._x, self._y, self._curve.name)
+        return "<Point\n    x: %x\n    y: %x\n    point on '%s' curve>" % (self.x, self.y, self.curve.name)
 
     def neg(self):
         return self.__neg__()
