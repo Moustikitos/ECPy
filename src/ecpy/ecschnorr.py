@@ -28,26 +28,16 @@ import hashlib
 import binascii
 
 
-jacobi = lambda x,p: pow(x, (p - 1) // 2, p)
-is_quad = lambda x,p: jacobi(x, p) == 1
-
-
-def tagged_hash(tag, msg, hasher):
-    tag_hash = hasher(tag.encode("utf-8") if not isinstance(tag, bytes) else tag).digest()
-    return hasher(tag_hash + tag_hash + msg).digest()
-
-
 class ECSchnorr:
     """
     ECSchnorr signer implementation according to:
  
       * `BSI: TR03111 <https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/Publications/TechGuidelines/TR03111/BSI-TR-03111_V-2-1_pdf.pdf>`_
       * `ISO/x: 14888-3 <http://www.iso.org/iso/iso_catalogue/catalogue_ics/catalogue_detail_ics.htm?csnumber=43656>`_
-      * `BIP: schnorr <https://github.com/sipa/bips/blob/bip-schnorr/bip-schnorr.mediawiki>`_
       * `Z: zilliqa <https://docs.zilliqa.com/whitepaper.pdf>`_
 
     In order to select the specification to be conform to, choose 
-    the corresponding string option: ``BSI``, ``ISO``, ``ISOx``, ``BIP``, ``Z``.
+    the corresponding string option: ``BSI``, ``ISO``, ``ISOx``, ``Z``.
     Default is ``ISO``.
 
     *Signature*:
@@ -76,14 +66,6 @@ class ECSchnorr:
         4. s = (k + r.d) mod(n)
            If s = 0 goto 1.
         5. Output (r, s)
-    Compute r,s according to BIP-schnorr standart:
-        1. k = H(kpriv||M[||suffix])
-           If jacobi(Qy, p) = 1 k = n-k
-        2. Q = [k]G
-        3. e = H(Qx||G.kpriv||M)
-        4. r = Qx mod(n)
-        5. s = (k + e.kpriv) mod(n)
-        6. Output (r, s)
     Compute r,s according to zilliqa lib:
         1. Generate a random k from [1, ..., n-1]
         2. Compute the commitment Q = kG, where  G is the base point
@@ -199,11 +181,11 @@ class ECSchnorr:
             return None
 
     # https://github.com/sipa/bips/blob/bip-schnorr/bip-schnorr.mediawiki
-    # https://github.com/sipa/bips/blob/bip-schnorr/bip-schnorr/reference.py
     def bip_sign(self, msg, pv_key):
         """
-        Sign a message hash according to bip-schnorr protocol. This protocol
-        is SECP256K1-curve-specific.
+        Sign a message hash according to bip-schnorr protocol:
+        https://github.com/sipa/bips/blob/bip-schnorr/bip-schnorr/reference.py
+        This protocol is SECP256K1-curve-specific.
 
         Args:
             msg (:class:`bytes`): the message hash to sign
@@ -217,12 +199,30 @@ class ECSchnorr:
         r, s = decode_sig(_schnorr.schnorr_sign(msg, seckey0), "RAW")
         return encode_sig(r, s, self.fmt, 0 if self.fmt not in ["RAW", "EDDSA"] else size)
 
+    def bcrypto410_sign(self, msg, pv_key):
+        """
+        Sign a message hash according to bcrypto 4.10 protocol:
+        https://github.com/bcoin-org/bcrypto/blob/v4.1.0/lib/js/schnorr.js
+        This protocol is SECP256K1-curve-specific.
+
+        Args:
+            msg (:class:`bytes`): the message hash to sign
+            pv_key (:class:`ecpy.keys.ECPrivateKey`): key to use for signing
+
+        Returns:
+            :class:(`(int, int)`): tupple containing r and s parts.
+        """
+        size = pv_key.curve.size>>3
+        seckey0 = pv_key.d.to_bytes(size, "big")
+        r, s = decode_sig(_schnorr.schnorr_bcrypto410_sign(msg, seckey0), "RAW")
+        return encode_sig(r, s, self.fmt, 0 if self.fmt not in ["RAW", "EDDSA"] else size)
+        
     # https://github.com/sipa/bips/blob/bip-schnorr/bip-schnorr.mediawiki
-    # https://github.com/sipa/bips/blob/bip-schnorr/bip-schnorr/reference.py
     def bip_verify(self, msg, sig, pu_key):
         """
-        Verify a message signature according to bip-schnorr protocol. This protocol
-        is SECP256K1-curve-specific.
+        Verify a message signature according to bip-schnorr protocol:
+        https://github.com/sipa/bips/blob/bip-schnorr/bip-schnorr/reference.py
+        This protocol is SECP256K1-curve-specific.
 
         Args:
             msg (:class:`bytes`):

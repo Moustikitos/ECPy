@@ -77,6 +77,46 @@ def pubkey_gen(seckey):
     P = point_mul(G, x)
     return bytes_from_point(P)
 
+# https://github.com/bcoin-org/bcrypto/blob/v4.1.0/lib/js/schnorr.js
+def schnorr_bcrypto410_sign(msg, seckey0):
+    if len(msg) != 32:
+        raise ValueError('The message must be a 32-byte array.')
+    # const a = this.curve.decodeScalar(key);
+    seckey0 = int_from_bytes(seckey0)
+    # if (a.isZero() || a.cmp(N) >= 0)
+    #   throw new Error('Invalid private key.');
+    if not (1 <= seckey0 <= n - 1):
+        raise ValueError('The secret key must be an integer in the range 1..n-1.')
+    # const k = this.hashInt(key, msg);
+    k0 = int_from_bytes(hashlib.sha256(bytes_from_int(seckey0) + msg).digest()) % n
+    # if (k.isZero())
+    #   throw new Error('Signing failed (k\' = 0).');
+    if k0 == 0:
+        raise RuntimeError('Failure. This happens only with negligible probability.')
+    # const R = G.mulBlind(k);
+    R = point_mul(G, k0)
+    # const Rraw = this.curve.encodeField(R.getX());
+    Rraw = bytes_from_point(R)
+    # const Araw = G.mulBlind(a).encode();
+    P = point_mul(G, seckey0)
+    Araw = (b"\x03" if y(P) & 1 else b"\x02") + bytes_from_int(x(P))
+    # const e = this.hashInt(Rraw, Araw, msg);
+    e = int_from_bytes(hashlib.sha256(Rraw + Araw + msg).digest()) % n
+    # const [blind, unblind] = this.curve.getBlinding(); // blind = unblind = 1
+    # a.imul(blind).imod(N);
+    # k.imul(blind).imod(N);
+    k0 %= n
+    seckey0 %= n
+    # if (R.y.redJacobi() !== 1)
+    #    k.ineg().imod(N); // -k%n == n-k
+    k = n - k0 if not is_quad(y(R)) else k0
+    # const S = k.iadd(e.imul(a)).imod(N);
+    S = (k + e * seckey0) % n
+    # S.imul(unblind).imod(N);
+    S %= n
+    # return Buffer.concat([Rraw, this.curve.encodeScalar(S)]);
+    return bytes_from_point(R) + bytes_from_int(S)
+
 def schnorr_sign(msg, seckey0):
     if len(msg) != 32:
         raise ValueError('The message must be a 32-byte array.')
@@ -115,7 +155,7 @@ def schnorr_verify(msg, pubkey, sig):
 
 
 
-__all__ = ["schnorr_sign", "schnorr_verify"]
+__all__ = ["schnorr_sign", "schnorr_verify", "schnorr_bcrypto410_sign"]
 
 #
 # The following code is only used to verify the test vectors.
