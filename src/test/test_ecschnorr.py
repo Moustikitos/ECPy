@@ -41,3 +41,8 @@ class TestEcschnorr(unittest.TestCase):
 		msg = signer._hasher(self.msg).digest()
 		self.assertEqual(True, signer.bip_verify(msg, signer.bip_sign(msg, self.privK), self.pubK))
 
+	def test_sign_bcrypto410(self):
+		signer = ECSchnorr(hashlib.sha256, "BIP", fmt="RAW")
+		msg = signer._hasher(self.msg).digest()
+		self.assertEqual(True, signer.bcrypto410_verify(msg, signer.bcrypto410_sign(msg, self.privK), self.pubK))
+

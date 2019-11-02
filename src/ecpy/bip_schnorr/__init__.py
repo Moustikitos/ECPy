@@ -50,6 +50,9 @@ def bytes_from_int(x):
 def bytes_from_point(P):
     return bytes_from_int(x(P))
 
+def encode_from_point(P):
+    return (b"\x03" if y(P) & 1 else b"\x02") + bytes_from_int(x(P))
+
 def point_from_bytes(b):
     x = int_from_bytes(b)
     y_sq = (pow(x, 3, p) + 7) % p
@@ -99,7 +102,7 @@ def schnorr_bcrypto410_sign(msg, seckey0):
     Rraw = bytes_from_point(R)
     # const Araw = G.mulBlind(a).encode();
     P = point_mul(G, seckey0)
-    Araw = (b"\x03" if y(P) & 1 else b"\x02") + bytes_from_int(x(P))
+    Araw = encode_from_point(P)
     # const e = this.hashInt(Rraw, Araw, msg);
     e = int_from_bytes(hashlib.sha256(Rraw + Araw + msg).digest()) % n
     # const [blind, unblind] = this.curve.getBlinding(); // blind = unblind = 1
@@ -116,6 +119,25 @@ def schnorr_bcrypto410_sign(msg, seckey0):
     S %= n
     # return Buffer.concat([Rraw, this.curve.encodeScalar(S)]);
     return bytes_from_point(R) + bytes_from_int(S)
+
+def schnorr_bcrypto410_verify(msg, P, sig):
+    if len(msg) != 32:
+        raise ValueError('The message must be a 32-byte array.')
+    if len(sig) != 64:
+        raise ValueError('The signature must be a 64-byte array.')
+    if (P is None):
+        return False
+    r = int_from_bytes(sig[0:32])
+    s = int_from_bytes(sig[32:64])
+    if (r >= p or s >= n):
+        return False
+    Rraw = sig[0:32]
+    Araw = encode_from_point(P)
+    e = int_from_bytes(hashlib.sha256(Rraw + Araw + msg).digest()) % n
+    R = point_add(point_mul(G, s), point_mul(P, n-e))
+    if R is None or not is_quad(y(R)) or x(R) != r:
+        return False
+    return True
 
 def schnorr_sign(msg, seckey0):
     if len(msg) != 32:
@@ -152,7 +174,6 @@ def schnorr_verify(msg, pubkey, sig):
     if R is None or not is_quad(y(R)) or x(R) != r:
         return False
     return True
-
 
 
 __all__ = ["schnorr_sign", "schnorr_verify", "schnorr_bcrypto410_sign"]

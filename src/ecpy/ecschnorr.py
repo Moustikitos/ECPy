@@ -238,6 +238,26 @@ class ECSchnorr:
         pubkey = pu_key.W.x.to_bytes(pu_key.W.curve.size>>3, "big")
         return _schnorr.schnorr_verify(msg, pubkey, sig)
 
+    def bcrypto410_verify(self, msg, sig, pu_key):
+        """
+        Verify a message signature according to bip-schnorr protocol:
+        https://github.com/bcoin-org/bcrypto/blob/v4.1.0/lib/js/schnorr.js
+        This protocol is SECP256K1-curve-specific.
+
+        Args:
+            msg (:class:`bytes`):
+                the message hash to verify the signature
+            sig (:class:`bytes`):
+                signature to verify
+            pu_key (:class:`ecpy.keys.ECPublicKey`):
+                public key to use for verifying
+
+        Returns:
+            :class:`bool`: true or false
+        """
+        P = [pu_key.W.x, pu_key.W.y]
+        return _schnorr.schnorr_bcrypto410_verify(msg, P, sig)
+
     def _do_sign(self, msg, pv_key, k):
         if (pv_key.curve == None):
             raise ECPyException('private key has no curve')

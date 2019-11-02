@@ -96,7 +96,7 @@ class Secp256k1(Encoder):
         xy = bytearray(data)
         x = int.from_bytes(xy[1:1+length], "big")
         if xy[0] in [2, 3]:
-            y = curve.y_recover(x, 0 if xy[0] == 2 else 1)
+            y = curve.y_recover(x, xy[0] == 3)
         elif xy[0] == 4:
             y = int.from_bytes(xy[1+length:], "big")
         else:
