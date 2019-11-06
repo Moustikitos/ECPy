@@ -33,8 +33,8 @@ setup(
     url              = 'https://github.com/cslashm/ECPy',
     license          = 'Apache License - Version 2.0',
     provides         = ['ecpy'],
-    packages         = ['ecpy'],
-    package_dir      = {'ecpy': 'src/ecpy'},
+    packages         = ['ecpy', 'ecpy.bip_schnorr'],
+    package_dir      = {'ecpy': 'src/ecpy', 'ecpy.bip_schnorr':'src/ecpy/bip_schnorr'},
     install_requires = ["future"] if sys.version_info[0] < 3 else [],
     classifiers      = [
         'Programming Language :: Python :: 2.7',
