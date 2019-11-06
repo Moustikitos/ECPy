@@ -23,7 +23,7 @@ with open('README.md') as file:
 
 setup(
     name             = 'ECPy',
-    version          = '0.10.0',
+    version          = '0.10.1',
     description      = 'Pure Pyhton Elliptic Curve Library',
     long_description = long_description,
     long_description_content_type = "text/markdown",
