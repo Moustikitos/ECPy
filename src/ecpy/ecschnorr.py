@@ -22,8 +22,8 @@ from ecpy.keys import ECPublicKey, ECPrivateKey
 from ecpy.formatters import decode_sig, encode_sig, FORMATS
 from ecpy import ecrand
 from ecpy.curves import ECPyException
+from ecpy import bip_schnorr as _schnorr
 
-import ecpy.bip_schnorr as _schnorr
 import hashlib
 import binascii
 
